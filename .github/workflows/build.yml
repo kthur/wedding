@@ -7,6 +7,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -98,6 +101,19 @@ jobs:
           name: windows-build-log
           path: windows_build.log
 
+      - name: Push Windows Build Log to Branch
+        if: failure()
+        shell: pwsh
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan debug-logs-windows
+          git rm -rf . --ignore-unmatch
+          Copy-Item windows_build.log index.log
+          git add index.log
+          git commit -m "ci: save windows build log"
+          git push -f origin HEAD:debug-logs-windows
+
       - name: Package Windows App (Zip)
         shell: pwsh
         run: |
@@ -135,6 +151,18 @@ jobs:
         with:
           name: ios-build-log
           path: ios_build.log
+
+      - name: Push iOS Build Log to Branch
+        if: failure()
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan debug-logs-ios
+          git rm -rf . --ignore-unmatch
+          cp ios_build.log index.log
+          git add index.log
+          git commit -m "ci: save ios build log"
+          git push -f origin HEAD:debug-logs-ios
 
       - name: Package iOS App (Zip)
         run: |

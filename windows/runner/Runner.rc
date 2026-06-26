@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "tmp_create" "\0"
+            VALUE "FileDescription", "wedding_planner" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "tmp_create" "\0"
+            VALUE "InternalName", "wedding_planner" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "tmp_create.exe" "\0"
-            VALUE "ProductName", "tmp_create" "\0"
+            VALUE "OriginalFilename", "wedding_planner.exe" "\0"
+            VALUE "ProductName", "wedding_planner" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

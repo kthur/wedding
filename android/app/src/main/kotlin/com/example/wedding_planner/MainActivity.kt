@@ -1,4 +1,4 @@
-package com.example.tmp_create
+package com.example.wedding_planner
 
 import io.flutter.embedding.android.FlutterActivity
 

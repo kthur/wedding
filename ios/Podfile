@@ -41,4 +41,12 @@ post_install do |installer|
       config.build_settings['DEFINES_MODULE'] = 'YES'
     end
   end
+
+  main_project = Xcodeproj::Project.open(File.join(File.dirname(__FILE__), 'Runner.xcodeproj'))
+  main_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+    end
+  end
+  main_project.save
 end

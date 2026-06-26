@@ -28,16 +28,17 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 flutter_ios_podfile_setup
 
 target 'Runner' do
+  use_frameworks! :linkage => :static
   use_modular_headers!
-  
-  pod 'gRPC-Core', :modular_headers => false
-  pod 'gRPC-C++', :modular_headers => false
-  pod 'BoringSSL-GRPC', :modular_headers => false
-  
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 end
 
 post_install do |installer|
+  # Pods project-level setting
+  installer.pods_project.build_configurations.each do |config|
+    config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+  end
+
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
     target.build_configurations.each do |config|
@@ -47,6 +48,11 @@ post_install do |installer|
   end
 
   main_project = Xcodeproj::Project.open(File.join(File.dirname(__FILE__), 'Runner.xcodeproj'))
+  # Main project-level settings
+  main_project.build_configurations.each do |config|
+    config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+  end
+  # Main project targets settings
   main_project.targets.each do |target|
     target.build_configurations.each do |config|
       config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'

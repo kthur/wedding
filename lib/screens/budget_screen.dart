@@ -135,7 +135,7 @@ class BudgetScreen extends ConsumerWidget {
                 margin: const EdgeInsets.only(bottom: 10),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
-                  side: Border.all(color: const Color(0xFFEEEEEE)),
+                  side: const BorderSide(color: Color(0xFFEEEEEE)),
                 ),
                 child: ListTile(
                   title: Text(entry.key, style: const TextStyle(fontWeight: FontWeight.bold)),

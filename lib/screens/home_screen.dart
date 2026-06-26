@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../providers/wedding_provider.dart';
+import '../models/wedding_category.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -289,7 +290,7 @@ class HomeScreen extends ConsumerWidget {
                       margin: const EdgeInsets.only(bottom: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
-                        side: Border.all(color: const Color(0xFFEEEEEE)),
+                        side: const BorderSide(color: Color(0xFFEEEEEE)),
                       ),
                       child: ListTile(
                         leading: Container(

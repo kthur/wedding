@@ -103,7 +103,7 @@ class _PreparationScreenState extends ConsumerState<PreparationScreen> with Sing
                       margin: const EdgeInsets.only(bottom: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
-                        side: Border.all(color: const Color(0xFFEEEEEE)),
+                        side: const BorderSide(color: Color(0xFFEEEEEE)),
                       ),
                       child: ListTile(
                         onTap: () {
@@ -194,7 +194,7 @@ class _PreparationScreenState extends ConsumerState<PreparationScreen> with Sing
                       margin: const EdgeInsets.only(bottom: 8),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
-                        side: Border.all(color: const Color(0xFFEEEEEE)),
+                        side: const BorderSide(color: Color(0xFFEEEEEE)),
                       ),
                       child: CheckboxListTile(
                         value: task.isDone,

@@ -202,7 +202,7 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
           alignment: Alignment.centerLeft,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
-            side: Border.all(color: const Color(0xFFEEEEEE)),
+            side: const BorderSide(color: Color(0xFFEEEEEE)),
           ),
         ),
       ),

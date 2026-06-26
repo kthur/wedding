@@ -122,7 +122,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                       margin: const EdgeInsets.only(bottom: 8),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
-                        side: Border.all(color: const Color(0xFFEEEEEE)),
+                        side: const BorderSide(color: Color(0xFFEEEEEE)),
                       ),
                       child: ListTile(
                         leading: const Icon(Icons.favorite, color: Color(0xFFFF5271)),

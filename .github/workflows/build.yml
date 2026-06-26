@@ -89,7 +89,7 @@ jobs:
         run: flutter config --enable-windows-desktop
 
       - name: Build Windows App
-        run: flutter build windows --release
+        run: flutter build windows --release --verbose
 
       - name: Package Windows App (Zip)
         shell: pwsh

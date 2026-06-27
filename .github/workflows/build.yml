@@ -55,8 +55,9 @@ jobs:
         env:
           FIREBASE_ANDROID_APP_ID: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: |
-          if [ -n "$FIREBASE_ANDROID_APP_ID" ] && [ -n "$FIREBASE_SERVICE_ACCOUNT" ]; then
+          if [ -n "$FIREBASE_ANDROID_APP_ID" ] && { [ -n "$FIREBASE_SERVICE_ACCOUNT" ] || [ -n "$FIREBASE_TOKEN" ]; }; then
             echo "has_credentials=true" >> $GITHUB_OUTPUT
           else
             echo "has_credentials=false" >> $GITHUB_OUTPUT
@@ -69,6 +70,7 @@ jobs:
           args: appdistribution:distribute build/app/outputs/flutter-apk/app-release.apk --app ${{ secrets.FIREBASE_ANDROID_APP_ID }} --groups testers
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
 
       - name: Upload Android Artifacts
         if: always()

@@ -1,3 +1,13 @@
+DateTime _parseDateTime(dynamic val) {
+  if (val == null) return DateTime.now();
+  if (val is String) return DateTime.parse(val);
+  try {
+    return (val as dynamic).toDate() as DateTime;
+  } catch (_) {
+    return DateTime.now();
+  }
+}
+
 class CoupleInfo {
   final String? maleUid;
   final String? femaleUid;
@@ -16,7 +26,7 @@ class CoupleInfo {
       maleUid: map['maleUid'] as String?,
       femaleUid: map['femaleUid'] as String?,
       weddingDate: map['weddingDate'] != null 
-          ? DateTime.parse(map['weddingDate'] as String) 
+          ? _parseDateTime(map['weddingDate']) 
           : null,
       budgetGoal: map['budgetGoal'] as int? ?? 0,
     );

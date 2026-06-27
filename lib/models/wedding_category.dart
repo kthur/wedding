@@ -1,3 +1,13 @@
+DateTime _parseDateTime(dynamic val) {
+  if (val == null) return DateTime.now();
+  if (val is String) return DateTime.parse(val);
+  try {
+    return (val as dynamic).toDate() as DateTime;
+  } catch (_) {
+    return DateTime.now();
+  }
+}
+
 enum PreparationStatus {
   none,
   inProgress,
@@ -31,7 +41,7 @@ class CategorySchedule {
   factory CategorySchedule.fromMap(Map<String, dynamic> map) {
     return CategorySchedule(
       id: map['id'] as String? ?? '',
-      date: DateTime.parse(map['date'] as String),
+      date: _parseDateTime(map['date']),
       title: map['title'] as String? ?? '',
       reminderDays: map['reminderDays'] as int? ?? 1,
     );
@@ -65,7 +75,7 @@ class CategoryPhoto {
       url: map['url'] as String? ?? '',
       caption: map['caption'] as String? ?? '',
       uploadedBy: map['uploadedBy'] as String? ?? '',
-      uploadedAt: DateTime.parse(map['uploadedAt'] as String),
+      uploadedAt: _parseDateTime(map['uploadedAt']),
     );
   }
 
@@ -133,9 +143,7 @@ class WeddingCategory {
               .toList() ??
           [],
       updatedBy: map['updatedBy'] as String? ?? '',
-      updatedAt: map['updatedAt'] != null
-          ? DateTime.parse(map['updatedAt'] as String)
-          : DateTime.now(),
+      updatedAt: _parseDateTime(map['updatedAt']),
     );
   }
 

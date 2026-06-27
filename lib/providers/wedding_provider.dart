@@ -1,5 +1,9 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/couple_info.dart';
 import '../models/wedding_category.dart';
 import '../models/checklist_item.dart';
@@ -55,9 +59,18 @@ class WeddingState {
 
 class WeddingNotifier extends StateNotifier<WeddingState> {
   final SharedPreferences _prefs;
+  final List<StreamSubscription> _subscriptions = [];
 
   WeddingNotifier(this._prefs) : super(WeddingState()) {
     _initLocalData();
+  }
+
+  @override
+  void dispose() {
+    for (var sub in _subscriptions) {
+      sub.cancel();
+    }
+    super.dispose();
   }
 
   // 기본 시기별 체크리스트 목록 정의
@@ -124,7 +137,7 @@ class WeddingNotifier extends StateNotifier<WeddingState> {
       inviteCode: _prefs.getString('user_invite_code')!,
     );
 
-    // 카테고리 초기 데이터 로드 (24개 카테고리)
+    // 카테고리 초기 데이터 정의
     final List<Map<String, String>> defaultCategories = [
       // 식장 & 의식
       {'id': 'planner', 'name': '웨딩 플래너', 'group': '식장 & 의식'},
@@ -156,6 +169,11 @@ class WeddingNotifier extends StateNotifier<WeddingState> {
       {'id': 'furniture', 'name': '혼수 리스트', 'group': '신혼 준비'},
       {'id': 'honeymoon', 'name': '신혼여행', 'group': '신혼 준비'},
     ];
+
+    if (Firebase.apps.isNotEmpty && currentUser.coupleId != null) {
+      _initFirestoreSync(currentUser, defaultCategories);
+      return;
+    }
 
     List<WeddingCategory> categories = [];
     for (var cat in defaultCategories) {
@@ -291,6 +309,126 @@ class WeddingNotifier extends StateNotifier<WeddingState> {
     );
   }
 
+  void _initFirestoreSync(UserProfile currentUser, List<Map<String, String>> defaultCategories) {
+    final coupleId = currentUser.coupleId!;
+    final coupleDoc = FirebaseFirestore.instance.collection('couples').doc(coupleId);
+
+    for (var sub in _subscriptions) {
+      sub.cancel();
+    }
+    _subscriptions.clear();
+
+    state = state.copyWith(isLoading: true, currentUser: currentUser);
+
+    // 1. 커플 정보 리스너
+    _subscriptions.add(coupleDoc.snapshots().listen((snap) async {
+      if (!snap.exists) {
+        await coupleDoc.set({
+          'maleUid': currentUser.gender == 'male' ? currentUser.uid : 'partner_uid',
+          'femaleUid': currentUser.gender == 'female' ? currentUser.uid : 'partner_uid',
+          'weddingDate': DateTime.now().add(const Duration(days: 180)).toIso8601String(),
+          'budgetGoal': 40000000,
+        });
+      } else {
+        final data = snap.data();
+        if (data != null) {
+          state = state.copyWith(coupleInfo: CoupleInfo.fromMap(data));
+        }
+      }
+    }, onError: (e) => debugPrint('Firestore couple listen error: $e')));
+
+    // 2. 카테고리 정보 리스너
+    final categoriesCol = coupleDoc.collection('categories');
+    _subscriptions.add(categoriesCol.snapshots().listen((snap) async {
+      if (snap.docs.isEmpty) {
+        final batch = FirebaseFirestore.instance.batch();
+        for (var cat in defaultCategories) {
+          final docRef = categoriesCol.doc(cat['id']);
+          batch.set(docRef, {
+            'name': cat['name'],
+            'groupName': cat['group'],
+            'status': 'none',
+            'estimatedCost': 0,
+            'actualCost': 0,
+            'notes': '',
+            'vendorName': '',
+            'vendorPhone': '',
+            'schedules': [],
+            'photos': [],
+            'updatedBy': '시스템',
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        }
+        await batch.commit();
+      } else {
+        final list = snap.docs.map((doc) => WeddingCategory.fromMap(doc.data(), doc.id)).toList();
+        state = state.copyWith(categories: list);
+      }
+    }, onError: (e) => debugPrint('Firestore categories listen error: $e')));
+
+    // 3. 체크리스트 리스너
+    final checklistCol = coupleDoc.collection('checklist');
+    _subscriptions.add(checklistCol.snapshots().listen((snap) async {
+      if (snap.docs.isEmpty) {
+        final batch = FirebaseFirestore.instance.batch();
+        for (int i = 0; i < _defaultTimelineTasks.length; i++) {
+          final task = _defaultTimelineTasks[i];
+          final docRef = checklistCol.doc('timeline_$i');
+          batch.set(docRef, {
+            'phase': task['phase'],
+            'title': task['title'],
+            'isDone': false,
+            'linkedCategoryId': _getLinkedIdByName(task['linked'] ?? '', defaultCategories),
+            'createdBy': '시스템',
+          });
+        }
+        await batch.commit();
+      } else {
+        final list = snap.docs.map((doc) => TimelineChecklistItem.fromMap(doc.data(), doc.id)).toList();
+        state = state.copyWith(timelineChecklist: list);
+      }
+    }, onError: (e) => debugPrint('Firestore checklist listen error: $e')));
+
+    // 4. 하객 정보 리스너
+    final guestsCol = coupleDoc.collection('guests');
+    _subscriptions.add(guestsCol.snapshots().listen((snap) async {
+      if (snap.docs.isEmpty) {
+        final batch = FirebaseFirestore.instance.batch();
+        final defaultGuests = [
+          GuestItem(id: 'guest_0', name: '김철수', phone: '010-1234-5678', side: 'groom', mealConfirmed: true, attended: false),
+          GuestItem(id: 'guest_1', name: '이영희', phone: '010-8765-4321', side: 'bride', mealConfirmed: true, attended: false),
+          GuestItem(id: 'guest_2', name: '박민준', phone: '010-4455-6677', side: 'groom', mealConfirmed: false, attended: false),
+        ];
+        for (var guest in defaultGuests) {
+          final docRef = guestsCol.doc(guest.id);
+          batch.set(docRef, guest.toMap());
+        }
+        await batch.commit();
+      } else {
+        final list = snap.docs.map((doc) => GuestItem.fromMap(doc.data(), doc.id)).toList();
+        state = state.copyWith(guests: list);
+      }
+    }, onError: (e) => debugPrint('Firestore guests listen error: $e')));
+
+    // 5. 메모 정보 리스너
+    final memosCol = coupleDoc.collection('memos');
+    _subscriptions.add(memosCol.snapshots().listen((snap) {
+      final list = snap.docs.map((doc) => doc.data()).toList();
+      state = state.copyWith(memos: list);
+    }, onError: (e) => debugPrint('Firestore memos listen error: $e')));
+
+    state = state.copyWith(isLoading: false);
+  }
+
+  String? _getLinkedIdByName(String name, List<Map<String, String>> defaultCategories) {
+    try {
+      final match = defaultCategories.firstWhere((c) => c['name'] == name);
+      return match['id'];
+    } catch (_) {
+      return null;
+    }
+  }
+
   // 3자리 초대코드로 커플 연동 진행
   bool linkPartner(String code) {
     if (code.length == 3) {
@@ -319,6 +457,15 @@ class WeddingNotifier extends StateNotifier<WeddingState> {
     state = state.copyWith(
       categories: state.categories.map((c) => c.id == updated.id ? updated : c).toList(),
     );
+
+    if (Firebase.apps.isNotEmpty && state.currentUser?.coupleId != null) {
+      FirebaseFirestore.instance
+          .collection('couples')
+          .doc(state.currentUser!.coupleId)
+          .collection('categories')
+          .doc(updated.id)
+          .set(updated.toMap());
+    }
 
     // 카테고리가 완료되면 연동된 시기별 체크리스트 상태도 업데이트
     if (updated.status == PreparationStatus.done) {
@@ -349,8 +496,26 @@ class WeddingNotifier extends StateNotifier<WeddingState> {
             final updatedCat = cat.copyWith(status: PreparationStatus.done);
             _prefs.setString('cat_${cat.id}_status', PreparationStatus.done.name);
             updatedCategories[catIndex] = updatedCat;
+            
+            if (Firebase.apps.isNotEmpty && state.currentUser?.coupleId != null) {
+              FirebaseFirestore.instance
+                  .collection('couples')
+                  .doc(state.currentUser!.coupleId)
+                  .collection('categories')
+                  .doc(cat.id)
+                  .update({'status': PreparationStatus.done.name});
+            }
           }
         }
+      }
+
+      if (Firebase.apps.isNotEmpty && state.currentUser?.coupleId != null) {
+        FirebaseFirestore.instance
+            .collection('couples')
+            .doc(state.currentUser!.coupleId)
+            .collection('checklist')
+            .doc(id)
+            .update({'isDone': newDone});
       }
 
       state = state.copyWith(
@@ -365,6 +530,15 @@ class WeddingNotifier extends StateNotifier<WeddingState> {
       if (task.linkedCategoryId == categoryId) {
         final index = state.timelineChecklist.indexOf(task);
         _prefs.setBool('timeline_task_${index}_isDone', isDone);
+        
+        if (Firebase.apps.isNotEmpty && state.currentUser?.coupleId != null) {
+          FirebaseFirestore.instance
+              .collection('couples')
+              .doc(state.currentUser!.coupleId)
+              .collection('checklist')
+              .doc(task.id)
+              .update({'isDone': isDone});
+        }
         return task.copyWith(isDone: isDone);
       }
       return task;
@@ -394,6 +568,15 @@ class WeddingNotifier extends StateNotifier<WeddingState> {
     _prefs.setBool('${guestKey}mealConfirmed', false);
     _prefs.setBool('${guestKey}attended', false);
 
+    if (Firebase.apps.isNotEmpty && state.currentUser?.coupleId != null) {
+      FirebaseFirestore.instance
+          .collection('couples')
+          .doc(state.currentUser!.coupleId)
+          .collection('guests')
+          .doc(newGuest.id)
+          .set(newGuest.toMap());
+    }
+
     state = state.copyWith(guests: updated);
   }
 
@@ -403,6 +586,16 @@ class WeddingNotifier extends StateNotifier<WeddingState> {
       if (g.id == id) {
         final idx = state.guests.indexOf(g);
         _prefs.setBool('guest_${idx}_mealConfirmed', !g.mealConfirmed);
+        
+        if (Firebase.apps.isNotEmpty && state.currentUser?.coupleId != null) {
+          FirebaseFirestore.instance
+              .collection('couples')
+              .doc(state.currentUser!.coupleId)
+              .collection('guests')
+              .doc(id)
+              .update({'mealConfirmed': !g.mealConfirmed});
+        }
+
         return GuestItem(
           id: g.id,
           name: g.name,
@@ -433,6 +626,14 @@ class WeddingNotifier extends StateNotifier<WeddingState> {
     _prefs.setString('memo_${updated.length - 1}_sender', userName);
     _prefs.setString('memo_${updated.length - 1}_time', timeStr);
 
+    if (Firebase.apps.isNotEmpty && state.currentUser?.coupleId != null) {
+      FirebaseFirestore.instance
+          .collection('couples')
+          .doc(state.currentUser!.coupleId)
+          .collection('memos')
+          .add(newMemo);
+    }
+
     state = state.copyWith(memos: updated);
   }
 
@@ -455,6 +656,19 @@ class WeddingNotifier extends StateNotifier<WeddingState> {
       _prefs.setString('${photoKey}caption', photo.caption);
       _prefs.setString('${photoKey}uploadedBy', photo.uploadedBy);
       _prefs.setString('${photoKey}uploadedAt', photo.uploadedAt.toIso8601String());
+
+      if (Firebase.apps.isNotEmpty && state.currentUser?.coupleId != null) {
+        FirebaseFirestore.instance
+            .collection('couples')
+            .doc(state.currentUser!.coupleId)
+            .collection('categories')
+            .doc(categoryId)
+            .update({
+              'photos': updatedPhotos.map((p) => p.toMap()).toList(),
+              'updatedBy': updatedCat.updatedBy,
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
+      }
 
       state = state.copyWith(
         categories: state.categories.map((c) => c.id == categoryId ? updatedCat : c).toList(),
@@ -482,6 +696,19 @@ class WeddingNotifier extends StateNotifier<WeddingState> {
         _prefs.setString('${photoKey}caption', updatedPhotos[i].caption);
         _prefs.setString('${photoKey}uploadedBy', updatedPhotos[i].uploadedBy);
         _prefs.setString('${photoKey}uploadedAt', updatedPhotos[i].uploadedAt.toIso8601String());
+      }
+
+      if (Firebase.apps.isNotEmpty && state.currentUser?.coupleId != null) {
+        FirebaseFirestore.instance
+            .collection('couples')
+            .doc(state.currentUser!.coupleId)
+            .collection('categories')
+            .doc(categoryId)
+            .update({
+              'photos': updatedPhotos.map((p) => p.toMap()).toList(),
+              'updatedBy': updatedCat.updatedBy,
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
       }
 
       state = state.copyWith(
@@ -513,6 +740,21 @@ class WeddingNotifier extends StateNotifier<WeddingState> {
       _prefs.setString('${photoKey}caption', photo.caption);
       _prefs.setString('${photoKey}uploadedBy', photo.uploadedBy);
       _prefs.setString('${photoKey}uploadedAt', photo.uploadedAt.toIso8601String());
+
+      if (Firebase.apps.isNotEmpty && state.currentUser?.coupleId != null) {
+        FirebaseFirestore.instance
+            .collection('couples')
+            .doc(state.currentUser!.coupleId)
+            .collection('categories')
+            .doc(categoryId)
+            .update({
+              'actualCost': actualCost,
+              'vendorName': vendorName,
+              'photos': updatedPhotos.map((p) => p.toMap()).toList(),
+              'updatedBy': updatedCat.updatedBy,
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
+      }
 
       state = state.copyWith(
         categories: state.categories.map((c) => c.id == categoryId ? updatedCat : c).toList(),

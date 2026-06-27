@@ -61,7 +61,7 @@ jobs:
 
       - name: Deploy to Firebase App Distribution
         if: "${{ secrets.FIREBASE_ANDROID_APP_ID != '' && secrets.FIREBASE_SERVICE_ACCOUNT != '' }}"
-        uses: w9jds/firebase-action@v2.2.8
+        uses: w9jds/firebase-action@v15.22.1
         with:
           args: appdistribution:distribute build/app/outputs/flutter-apk/app-release.apk --app ${{ secrets.FIREBASE_ANDROID_APP_ID }} --groups testers
         env:

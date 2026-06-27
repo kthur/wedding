@@ -60,7 +60,7 @@ jobs:
         run: flutter build appbundle --release
 
       - name: Deploy to Firebase App Distribution
-        if: ${{ secrets.FIREBASE_ANDROID_APP_ID != '' && secrets.FIREBASE_SERVICE_ACCOUNT != '' }}
+        if: secrets.FIREBASE_ANDROID_APP_ID != '' && secrets.FIREBASE_SERVICE_ACCOUNT != ''
         uses: w9jds/firebase-action@v2.2.8
         with:
           args: appdistribution:distribute build/app/outputs/flutter-apk/app-release.apk --app ${{ secrets.FIREBASE_ANDROID_APP_ID }} --groups testers
@@ -244,7 +244,7 @@ jobs:
         run: flutter build web --release
 
       - name: Deploy to Firebase Hosting
-        if: ${{ secrets.FIREBASE_SERVICE_ACCOUNT != '' }}
+        if: secrets.FIREBASE_SERVICE_ACCOUNT != ''
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}

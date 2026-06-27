@@ -42,8 +42,11 @@ jobs:
 
       - name: Check Firebase Credentials
         id: firebase_check
+        env:
+          FIREBASE_ANDROID_APP_ID: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
-          if [ -n "${{ secrets.FIREBASE_ANDROID_APP_ID }}" ] && [ -n "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" ]; then
+          if [ -n "$FIREBASE_ANDROID_APP_ID" ] && [ -n "$FIREBASE_SERVICE_ACCOUNT" ]; then
             echo "has_credentials=true" >> $GITHUB_OUTPUT
           else
             echo "has_credentials=false" >> $GITHUB_OUTPUT

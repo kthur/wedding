@@ -1,29 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
-import '../providers/wedding_provider.dart';
+import '../providers/auth_provider.dart';
+import '../providers/category_provider.dart';
 
 class BudgetScreen extends ConsumerWidget {
   const BudgetScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final weddingState = ref.watch(weddingProvider);
+    final authState = ref.watch(authProvider);
+    final categories = ref.watch(categoryProvider);
 
     int estimatedTotal = 0;
     int actualTotal = 0;
 
-    for (var cat in weddingState.categories) {
+    for (var cat in categories) {
       estimatedTotal += cat.estimatedCost;
       actualTotal += cat.actualCost;
     }
 
-    final goal = weddingState.coupleInfo?.budgetGoal ?? 35000000;
+    final goal = authState.coupleInfo?.budgetGoal ?? 35000000;
     final remains = goal - actualTotal;
 
     // 그룹별 비용 정보
     final Map<String, int> groupCostMap = {};
-    for (var cat in weddingState.categories) {
+    for (var cat in categories) {
       groupCostMap.update(cat.groupName, (val) => val + cat.actualCost, ifAbsent: () => cat.actualCost);
     }
 
@@ -95,7 +97,7 @@ class BudgetScreen extends ConsumerWidget {
                   const Divider(height: 24),
                   _buildBudgetRow(
                     remains >= 0 ? '남은 예산 여유' : '예산 초과 경고',
-                    '${_formatPrice(remains.abs())}원',
+                    remains >= 0 ? '${_formatPrice(remains)}원' : '${_formatPrice(remains.abs())}원 초과',
                     remains >= 0 ? Colors.blue : Colors.red,
                     true,
                   ),

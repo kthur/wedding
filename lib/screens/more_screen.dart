@@ -1,6 +1,17 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../providers/wedding_provider.dart';
+import 'package:intl/intl.dart';
+import 'package:syncfusion_flutter_xlsio/xlsio.dart' as xlsio;
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import '../providers/auth_provider.dart';
+import '../providers/guest_provider.dart';
+import '../providers/memo_provider.dart';
+import '../providers/category_provider.dart';
+import '../models/guest_item.dart';
 
 class MoreScreen extends ConsumerStatefulWidget {
   const MoreScreen({super.key});
@@ -20,7 +31,9 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final weddingState = ref.watch(weddingProvider);
+    final guests = ref.watch(guestProvider);
+    final memos = ref.watch(memoProvider);
+    final authState = ref.watch(authProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFFFAFAFC),
@@ -47,9 +60,9 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _buildCountItem('총 청첩 대상', '${weddingState.guests.length}명'),
-                  _buildCountItem('식사 확정', '${weddingState.guests.where((g) => g.mealConfirmed).length}명'),
-                  _buildCountItem('미정', '${weddingState.guests.where((g) => !g.mealConfirmed).length}명'),
+                  _buildCountItem('총 청첩 대상', '${guests.length}명'),
+                  _buildCountItem('식사 확정', '${guests.where((g) => g.mealConfirmed).length}명'),
+                  _buildCountItem('미정', '${guests.where((g) => !g.mealConfirmed).length}명'),
                 ],
               ),
             ),
@@ -82,43 +95,62 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                         icon: const Icon(Icons.send, color: Color(0xFFFF5271)),
                         onPressed: () {
                           if (_memoController.text.isNotEmpty) {
-                            ref.read(weddingProvider.notifier).sendMemo(_memoController.text);
+                            ref.read(memoProvider.notifier).sendMemo(_memoController.text);
                             _memoController.clear();
                           }
                         },
                       )
                     ],
                   ),
-                  if (weddingState.memos.isNotEmpty) ...[
+                  if (memos.isNotEmpty) ...[
                     const Divider(),
                     ListView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
-                      itemCount: weddingState.memos.length,
+                      itemCount: memos.length,
                       itemBuilder: (context, index) {
-                        final memo = weddingState.memos[index];
+                        final memo = memos[index];
+                        final isCurrentUser = memo['sender'] == (authState.currentUser?.name ?? '나');
                         return Padding(
                           padding: const EdgeInsets.symmetric(vertical: 6),
                           child: Align(
-                            alignment: Alignment.centerLeft,
+                            // Fixed left alignment issue (M-5 equivalent UX improvement)
+                            alignment: isCurrentUser ? Alignment.centerRight : Alignment.centerLeft,
                             child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                              crossAxisAlignment: isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                               children: [
                                 Row(
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Text(
-                                      '${memo['sender']}',
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFFFF5271)),
-                                    ),
-                                    const SizedBox(width: 8),
+                                    if (!isCurrentUser) ...[
+                                      Text(
+                                        '${memo['sender']}',
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFFFF5271)),
+                                      ),
+                                      const SizedBox(width: 8),
+                                    ],
                                     Text(
                                       '${memo['time']}',
                                       style: const TextStyle(fontSize: 10, color: Colors.grey),
                                     ),
+                                    if (isCurrentUser) ...[
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        '${memo['sender']}',
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blue),
+                                      ),
+                                    ],
                                   ],
                                 ),
                                 const SizedBox(height: 4),
-                                Text('${memo['text']}', style: const TextStyle(fontSize: 14)),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: isCurrentUser ? const Color(0xFFE3F2FD) : const Color(0xFFF5F5F5),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text('${memo['text']}', style: const TextStyle(fontSize: 14)),
+                                ),
                               ],
                             ),
                           ),
@@ -138,26 +170,143 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
               'Excel (.xlsx) 파일로 내보내기',
               Icons.grid_on,
               Colors.green,
-              () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Excel 파일 생성을 완료했습니다! 📁')),
-                );
-              },
+              () => _exportToExcel(context),
             ),
             const SizedBox(height: 12),
             _buildExportButton(
               'PDF 보고서로 내보내기',
               Icons.picture_as_pdf,
               Colors.red,
-              () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('PDF 보고서 내보내기를 완료했습니다! 📄')),
-                );
-              },
+              () => _exportToPdf(context),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _exportToExcel(BuildContext context) async {
+    try {
+      final categories = ref.read(categoryProvider);
+      final guestList = ref.read(guestProvider);
+
+      final xlsio.Workbook workbook = xlsio.Workbook();
+      final xlsio.Worksheet sheet = workbook.worksheets[0];
+      sheet.name = '결혼 준비 카테고리';
+
+      sheet.getRangeByName('A1').setText('결혼 준비 카테고리 지출 현황');
+      sheet.getRangeByName('A1').cellStyle.bold = true;
+      sheet.getRangeByName('A1').cellStyle.fontSize = 14;
+
+      sheet.getRangeByName('A3').setText('카테고리명');
+      sheet.getRangeByName('B3').setText('그룹명');
+      sheet.getRangeByName('C3').setText('진행상태');
+      sheet.getRangeByName('D3').setText('예상예산');
+      sheet.getRangeByName('E3').setText('실제지출');
+      sheet.getRangeByName('F3').setText('메모');
+
+      int row = 4;
+      for (var cat in categories) {
+        sheet.getRangeByIndex(row, 1).setText(cat.name);
+        sheet.getRangeByIndex(row, 2).setText(cat.groupName);
+        sheet.getRangeByIndex(row, 3).setText(cat.status.displayName);
+        sheet.getRangeByIndex(row, 4).setNumber(cat.estimatedCost.toDouble());
+        sheet.getRangeByIndex(row, 5).setNumber(cat.actualCost.toDouble());
+        sheet.getRangeByIndex(row, 6).setText(cat.notes);
+        row++;
+      }
+
+      final xlsio.Worksheet guestSheet = workbook.worksheets.addWithName('하객 명단');
+      guestSheet.getRangeByName('A1').setText('하객 명단 및 식사 여부');
+      guestSheet.getRangeByName('A1').cellStyle.bold = true;
+
+      guestSheet.getRangeByName('A3').setText('이름');
+      guestSheet.getRangeByName('B3').setText('연락처');
+      guestSheet.getRangeByName('C3').setText('구분');
+      guestSheet.getRangeByName('D3').setText('식사확정');
+
+      int gRow = 4;
+      for (var guest in guestList) {
+        guestSheet.getRangeByIndex(gRow, 1).setText(guest.name);
+        guestSheet.getRangeByIndex(gRow, 2).setText(guest.phone);
+        guestSheet.getRangeByIndex(gRow, 3).setText(guest.side == 'groom' ? '신랑측' : '신부측');
+        guestSheet.getRangeByIndex(gRow, 4).setText(guest.mealConfirmed ? '확정' : '미정');
+        gRow++;
+      }
+
+      final List<int> bytes = workbook.saveAsStream();
+      workbook.dispose();
+
+      final Directory directory = await getTemporaryDirectory();
+      final File file = File('${directory.path}/wedding_planner_export.xlsx');
+      await file.writeAsBytes(bytes, flush: true);
+
+      await Share.shareXFiles([XFile(file.path)], text: '결혼 준비 현황 엑셀 내보내기');
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Excel 파일 생성에 실패했습니다: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _exportToPdf(BuildContext context) async {
+    try {
+      final categories = ref.read(categoryProvider);
+      final coupleInfo = ref.read(authProvider).coupleInfo;
+
+      final pdfDoc = pw.Document();
+
+      pdfDoc.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          build: (pw.Context context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text('Wedding Planner Report', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(height: 12),
+                pw.Text('Wedding Date: ${coupleInfo?.weddingDate != null ? DateFormat('yyyy-MM-dd').format(coupleInfo!.weddingDate!) : "Not Set"}'),
+                pw.Text('Budget Goal: ${coupleInfo?.budgetGoal ?? 0} Won'),
+                pw.SizedBox(height: 20),
+                pw.Text('Category Budgets Summary:', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(height: 10),
+                ...categories.map((cat) {
+                  return pw.Bullet(
+                    text: '${cat.name} (${cat.groupName}): Estimated: ${cat.estimatedCost} | Actual: ${cat.actualCost} | Status: ${cat.status.name}'
+                  );
+                }),
+              ],
+            );
+          },
+        ),
+      );
+
+      final List<int> bytes = await pdfDoc.save();
+
+      final Directory directory = await getTemporaryDirectory();
+      final File file = File('${directory.path}/wedding_report.pdf');
+      await file.writeAsBytes(bytes, flush: true);
+
+      await Share.shareXFiles([XFile(file.path)], text: '결혼 준비 보고서 PDF 내보내기');
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('PDF 파일 생성에 실패했습니다: $e')),
+        );
+      }
+    }
+  }
+
+  void _showGuestManager(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return const _GuestManagerModal();
+      },
     );
   }
 
@@ -208,28 +357,26 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
       ),
     );
   }
-
-  void _showGuestManager(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return _GuestManagerModal();
-      },
-    );
-  }
 }
 
 class _GuestManagerModal extends ConsumerStatefulWidget {
+  const _GuestManagerModal();
+
   @override
   ConsumerState<_GuestManagerModal> createState() => _GuestManagerModalState();
 }
 
 class _GuestManagerModalState extends ConsumerState<_GuestManagerModal> {
-  final _nameController = TextEditingController();
-  final _phoneController = TextEditingController();
+  late TextEditingController _nameController;
+  late TextEditingController _phoneController;
   String _side = 'groom';
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController();
+    _phoneController = TextEditingController();
+  }
 
   @override
   void dispose() {
@@ -240,7 +387,7 @@ class _GuestManagerModalState extends ConsumerState<_GuestManagerModal> {
 
   @override
   Widget build(BuildContext context) {
-    final weddingState = ref.watch(weddingProvider);
+    final guests = ref.watch(guestProvider);
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.85,
@@ -291,7 +438,7 @@ class _GuestManagerModalState extends ConsumerState<_GuestManagerModal> {
               ElevatedButton(
                 onPressed: () {
                   if (_nameController.text.isNotEmpty) {
-                    ref.read(weddingProvider.notifier).addGuest(
+                    ref.read(guestProvider.notifier).addGuest(
                           _nameController.text,
                           _phoneController.text,
                           _side,
@@ -308,9 +455,9 @@ class _GuestManagerModalState extends ConsumerState<_GuestManagerModal> {
           const SizedBox(height: 20),
           Expanded(
             child: ListView.builder(
-              itemCount: weddingState.guests.length,
+              itemCount: guests.length,
               itemBuilder: (context, index) {
-                final guest = weddingState.guests[index];
+                final GuestItem guest = guests[index];
                 return Card(
                   color: Colors.white,
                   margin: const EdgeInsets.only(bottom: 10),
@@ -325,7 +472,7 @@ class _GuestManagerModalState extends ConsumerState<_GuestManagerModal> {
                           value: guest.mealConfirmed,
                           activeColor: const Color(0xFFFF5271),
                           onChanged: (_) {
-                            ref.read(weddingProvider.notifier).toggleGuestMeal(guest.id);
+                            ref.read(guestProvider.notifier).toggleGuestMeal(guest.id);
                           },
                         ),
                       ],

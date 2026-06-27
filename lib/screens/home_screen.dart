@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import '../providers/wedding_provider.dart';
+import '../providers/auth_provider.dart';
+import '../providers/category_provider.dart';
+import '../providers/checklist_provider.dart';
 import '../models/wedding_category.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -9,26 +11,31 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final weddingState = ref.watch(weddingProvider);
-    final isLinked = weddingState.coupleInfo != null;
+    final authState = ref.watch(authProvider);
+    final categories = ref.watch(categoryProvider);
+    final timelineChecklist = ref.watch(checklistProvider);
+
+    final isLinked = authState.coupleInfo != null;
+    final currentUser = authState.currentUser;
+    final coupleInfo = authState.coupleInfo;
+
+    final weddingDate = coupleInfo?.weddingDate;
 
     // D-Day 계산
-    int dDay = 0;
     String dDayStr = 'D-기한 없음';
-    if (isLinked && weddingState.coupleInfo!.weddingDate != null) {
-      final diff = weddingState.coupleInfo!.weddingDate!.difference(DateTime.now()).inDays;
-      dDay = diff;
+    if (isLinked && weddingDate != null) {
+      final diff = weddingDate.difference(DateTime.now()).inDays;
       dDayStr = diff == 0 ? 'D-Day' : (diff > 0 ? 'D-$diff' : 'D+${diff.abs()}');
     }
 
     // 전체 진행률 계산
-    final total = weddingState.categories.length;
-    final completed = weddingState.categories.where((c) => c.status == PreparationStatus.done).length;
-    final inProgress = weddingState.categories.where((c) => c.status == PreparationStatus.inProgress).length;
+    final total = categories.length;
+    final completed = categories.where((c) => c.status == PreparationStatus.done).length;
+    final inProgress = categories.where((c) => c.status == PreparationStatus.inProgress).length;
     final progressPercentage = total > 0 ? ((completed / total) * 100).toInt() : 0;
 
-    // 다가오는 일정
-    final upcomingTasks = weddingState.timelineChecklist
+    // 다가오는 일정 (최대 3개)
+    final upcomingTasks = timelineChecklist
         .where((t) => !t.isDone)
         .take(3)
         .toList();
@@ -49,7 +56,7 @@ class HomeScreen extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '안녕하세요, ${weddingState.currentUser?.name ?? "사용자"}님',
+                        '안녕하세요, ${currentUser?.name ?? "사용자"}님',
                         style: const TextStyle(
                           fontSize: 16,
                           color: Color(0xFF757575),
@@ -106,7 +113,7 @@ class HomeScreen extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFFFF5271).withOpacity(0.3),
+                      color: const Color(0xFFFF5271).withValues(alpha: 0.3),
                       blurRadius: 15,
                       offset: const Offset(0, 8),
                     ),
@@ -127,9 +134,9 @@ class HomeScreen extends ConsumerWidget {
                             letterSpacing: -1,
                           ),
                         ),
-                        if (isLinked && weddingState.coupleInfo!.weddingDate != null)
+                        if (isLinked && weddingDate != null)
                           Text(
-                            DateFormat('yyyy년 MM월 dd일').format(weddingState.coupleInfo!.weddingDate!),
+                            DateFormat('yyyy년 MM월 dd일').format(weddingDate),
                             style: const TextStyle(
                               fontSize: 14,
                               color: Colors.white70,
@@ -155,7 +162,7 @@ class HomeScreen extends ConsumerWidget {
                             borderRadius: BorderRadius.circular(10),
                             child: LinearProgressIndicator(
                               value: progressPercentage / 100,
-                              backgroundColor: Colors.white.withOpacity(0.2),
+                              backgroundColor: Colors.white.withValues(alpha: 0.2),
                               valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
                               minHeight: 8,
                             ),
@@ -225,7 +232,7 @@ class HomeScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        '초대 코드 [ ${weddingState.currentUser?.inviteCode ?? ""} ]를 파트너 앱에 입력하면 예산, 일정 및 체크리스트가 실시간으로 동기화됩니다.',
+                        '초대 코드 [ ${currentUser?.inviteCode ?? ""} ]를 파트너 앱에 입력하면 예산, 일정 및 체크리스트가 실시간으로 동기화됩니다.',
                         style: const TextStyle(
                           fontSize: 13,
                           color: Color(0xFF757575),
@@ -320,7 +327,7 @@ class HomeScreen extends ConsumerWidget {
                           value: task.isDone,
                           activeColor: const Color(0xFFFF5271),
                           onChanged: (_) {
-                            ref.read(weddingProvider.notifier).toggleTimelineTask(task.id);
+                            ref.read(checklistProvider.notifier).toggleTimelineTask(task.id);
                           },
                         ),
                       ),
@@ -335,63 +342,94 @@ class HomeScreen extends ConsumerWidget {
   }
 
   void _showLinkCodeDialog(BuildContext context, WidgetRef ref) {
-    final textController = TextEditingController();
     showDialog(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+      builder: (context) => _LinkCodeDialog(ref: ref),
+    );
+  }
+}
+
+// Memory-leak free Stateful Dialog Component
+class _LinkCodeDialog extends StatefulWidget {
+  final WidgetRef ref;
+  const _LinkCodeDialog({required this.ref});
+
+  @override
+  State<_LinkCodeDialog> createState() => _LinkCodeDialogState();
+}
+
+class _LinkCodeDialogState extends State<_LinkCodeDialog> {
+  late TextEditingController _textController;
+
+  @override
+  void initState() {
+    super.initState();
+    _textController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _textController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      title: const Text(
+        '파트너 코드 입력',
+        style: TextStyle(fontWeight: FontWeight.bold),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            '파트너 화면에 보이는 3자리 초대 코드를 입력해 주세요.',
+            style: TextStyle(fontSize: 14, color: Colors.grey),
           ),
-          title: const Text(
-            '파트너 코드 입력',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                '파트너 화면에 보이는 3자리 초대 코드를 입력해 주세요.',
-                style: TextStyle(fontSize: 14, color: Colors.grey),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: textController,
-                maxLength: 3,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 8),
-                decoration: const InputDecoration(
-                  hintText: 'ABC',
-                  border: OutlineInputBorder(),
-                  counterText: '',
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('취소', style: TextStyle(color: Colors.grey)),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _textController,
+            maxLength: 3,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 8),
+            decoration: const InputDecoration(
+              hintText: 'ABC',
+              border: OutlineInputBorder(),
+              counterText: '',
             ),
-            TextButton(
-              onPressed: () {
-                final success = ref.read(weddingProvider.notifier).linkPartner(textController.text.toUpperCase());
-                Navigator.pop(context);
-                if (success) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('파트너와 성공적으로 연결되었습니다! 🎉')),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('코드가 바르지 않습니다. 다시 입력해 주세요.')),
-                  );
-                }
-              },
-              child: const Text('연결하기', style: TextStyle(color: Color(0xFFFF5271), fontWeight: FontWeight.bold)),
-            ),
-          ],
-        );
-      },
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('취소', style: TextStyle(color: Colors.grey)),
+        ),
+        TextButton(
+          onPressed: () async {
+            final success = await widget.ref
+                .read(authProvider.notifier)
+                .linkPartner(_textController.text.toUpperCase());
+            if (context.mounted) {
+              Navigator.pop(context);
+              if (success) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('파트너와 성공적으로 연결되었습니다! 🎉')),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('코드가 바르지 않습니다. 다시 입력해 주세요.')),
+                );
+              }
+            }
+          },
+          child: const Text('연결하기', style: TextStyle(color: Color(0xFFFF5271), fontWeight: FontWeight.bold)),
+        ),
+      ],
     );
   }
 }

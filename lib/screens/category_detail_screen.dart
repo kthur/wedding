@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/wedding_category.dart';
-import '../providers/wedding_provider.dart';
+import '../providers/auth_provider.dart';
+import '../providers/category_provider.dart';
 
 class CategoryDetailScreen extends ConsumerStatefulWidget {
   final String categoryId;
@@ -25,8 +26,25 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
   @override
   void initState() {
     super.initState();
-    final weddingState = ref.read(weddingProvider);
-    final category = weddingState.categories.firstWhere((c) => c.id == widget.categoryId);
+    final categories = ref.read(categoryProvider);
+    final category = categories.firstWhere(
+      (c) => c.id == widget.categoryId,
+      orElse: () => WeddingCategory(
+        id: widget.categoryId,
+        name: 'Unknown',
+        groupName: 'Unknown',
+        status: PreparationStatus.none,
+        estimatedCost: 0,
+        actualCost: 0,
+        notes: '',
+        vendorName: '',
+        vendorPhone: '',
+        schedules: [],
+        photos: [],
+        updatedBy: '',
+        updatedAt: DateTime.now(),
+      ),
+    );
 
     _notesController = TextEditingController(text: category.notes);
     _estCostController = TextEditingController(text: category.estimatedCost.toString());
@@ -48,8 +66,26 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final weddingState = ref.watch(weddingProvider);
-    final category = weddingState.categories.firstWhere((c) => c.id == widget.categoryId);
+    final categories = ref.watch(categoryProvider);
+    final authState = ref.watch(authProvider);
+    final category = categories.firstWhere(
+      (c) => c.id == widget.categoryId,
+      orElse: () => WeddingCategory(
+        id: widget.categoryId,
+        name: 'Unknown',
+        groupName: 'Unknown',
+        status: PreparationStatus.none,
+        estimatedCost: 0,
+        actualCost: 0,
+        notes: '',
+        vendorName: '',
+        vendorPhone: '',
+        schedules: [],
+        photos: [],
+        updatedBy: '',
+        updatedAt: DateTime.now(),
+      ),
+    );
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -77,13 +113,15 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
                 notes: _notesController.text,
                 vendorName: _vendorNameController.text,
                 vendorPhone: _vendorPhoneController.text,
-                updatedBy: weddingState.currentUser?.name ?? '사용자',
+                updatedBy: authState.currentUser?.name ?? '사용자',
                 updatedAt: DateTime.now(),
               );
 
-              ref.read(weddingProvider.notifier).updateCategory(updated);
+              ref.read(categoryProvider.notifier).updateCategory(updated);
+              
+              final messenger = ScaffoldMessenger.of(context);
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
+              messenger.showSnackBar(
                 const SnackBar(content: Text('준비 정보가 저장되었습니다! 💾')),
               );
             },
@@ -379,7 +417,7 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
                             icon: const Icon(Icons.close, size: 12, color: Colors.white),
                             padding: EdgeInsets.zero,
                             onPressed: () {
-                              ref.read(weddingProvider.notifier).deleteCategoryPhoto(category.id, photo.url);
+                              ref.read(categoryProvider.notifier).deleteCategoryPhoto(category.id, photo.url);
                             },
                           ),
                         ),
@@ -510,11 +548,11 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
   void _saveCategoryPhoto(String categoryId, String path, String caption) {
     final newPhoto = CategoryPhoto(
       url: path,
-      caption: caption.isEmpty ? '사진 첨部' : caption,
-      uploadedBy: ref.read(weddingProvider).currentUser?.name ?? '사용자',
+      caption: caption.isEmpty ? '사진 첨부' : caption,
+      uploadedBy: ref.read(authProvider).currentUser?.name ?? '사용자',
       uploadedAt: DateTime.now(),
     );
-    ref.read(weddingProvider.notifier).addCategoryPhoto(categoryId, newPhoto);
+    ref.read(categoryProvider.notifier).addCategoryPhoto(categoryId, newPhoto);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('사진이 성공적으로 첨부되었습니다! 📸')),
     );
@@ -675,11 +713,11 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
           final scanPhoto = CategoryPhoto(
             url: finalPath,
             caption: '영수증/계약서 스캔 내역',
-            uploadedBy: ref.read(weddingProvider).currentUser?.name ?? '사용자',
+            uploadedBy: ref.read(authProvider).currentUser?.name ?? '사용자',
             uploadedAt: DateTime.now(),
           );
           
-          ref.read(weddingProvider.notifier).updateCategoryBudgetFromScan(
+          ref.read(categoryProvider.notifier).updateCategoryBudgetFromScan(
             category.id,
             actualCost: cost,
             vendorName: vendor,
@@ -816,7 +854,7 @@ class _ScannerProgressDialogState extends State<_ScannerProgressDialog> with Sin
                               color: const Color(0xFFFF5271),
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(0xFFFF5271).withOpacity(0.8),
+                                  color: const Color(0xFFFF5271).withValues(alpha: 0.8),
                                   blurRadius: 10,
                                   spreadRadius: 2,
                                 ),

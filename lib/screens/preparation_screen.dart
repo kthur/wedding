@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/wedding_category.dart';
-import '../providers/wedding_provider.dart';
+import '../providers/category_provider.dart';
+import '../providers/checklist_provider.dart';
 import 'category_detail_screen.dart';
 
 class PreparationScreen extends ConsumerStatefulWidget {
@@ -28,11 +29,12 @@ class _PreparationScreenState extends ConsumerState<PreparationScreen> with Sing
 
   @override
   Widget build(BuildContext context) {
-    final weddingState = ref.watch(weddingProvider);
+    final categories = ref.watch(categoryProvider);
+    final timelineChecklist = ref.watch(checklistProvider);
 
     // 그룹별 카테고리 묶기
     final Map<String, List<WeddingCategory>> groupMap = {};
-    for (var cat in weddingState.categories) {
+    for (var cat in categories) {
       groupMap.putIfAbsent(cat.groupName, () => []).add(cat);
     }
 
@@ -44,7 +46,7 @@ class _PreparationScreenState extends ConsumerState<PreparationScreen> with Sing
       'D-1m': [],
       'D-2w': [],
     };
-    for (var task in weddingState.timelineChecklist) {
+    for (var task in timelineChecklist) {
       if (phaseMap.containsKey(task.phase)) {
         phaseMap[task.phase]!.add(task);
       }
@@ -123,7 +125,7 @@ class _PreparationScreenState extends ConsumerState<PreparationScreen> with Sing
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                               decoration: BoxDecoration(
-                                color: statusColor.withOpacity(0.1),
+                                color: statusColor.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
@@ -134,12 +136,12 @@ class _PreparationScreenState extends ConsumerState<PreparationScreen> with Sing
                             const SizedBox(width: 8),
                             if (cat.actualCost > 0)
                               Text(
-                                '실제금액: ${cat.actualCost}원',
+                                '실제금액: ${_formatPrice(cat.actualCost)}원',
                                 style: const TextStyle(fontSize: 12, color: Colors.grey),
                               )
                             else if (cat.estimatedCost > 0)
                               Text(
-                                '예상금액: ${cat.estimatedCost}원',
+                                '예상금액: ${_formatPrice(cat.estimatedCost)}원',
                                 style: const TextStyle(fontSize: 12, color: Colors.grey),
                               )
                           ],
@@ -208,7 +210,7 @@ class _PreparationScreenState extends ConsumerState<PreparationScreen> with Sing
                           ),
                         ),
                         onChanged: (_) {
-                          ref.read(weddingProvider.notifier).toggleTimelineTask(task.id);
+                          ref.read(checklistProvider.notifier).toggleTimelineTask(task.id);
                         },
                         controlAffinity: ListTileControlAffinity.trailing,
                       ),
@@ -222,5 +224,9 @@ class _PreparationScreenState extends ConsumerState<PreparationScreen> with Sing
         ],
       ),
     );
+  }
+
+  String _formatPrice(int price) {
+    return price.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},');
   }
 }

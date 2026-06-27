@@ -4,11 +4,24 @@ import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, Tar
 
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
-    return const FirebaseOptions(
-      apiKey: 'mock-api-key',
-      appId: 'mock-app-id',
-      messagingSenderId: 'mock-sender-id',
-      projectId: 'mock-project-id',
-    );
+    if (kIsWeb) {
+      throw UnsupportedError('Web is not configured');
+    }
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+        return android;
+      case TargetPlatform.iOS:
+        throw UnsupportedError('iOS is not configured');
+      default:
+        throw UnsupportedError('Unsupported platform');
+    }
   }
+
+  static const FirebaseOptions android = FirebaseOptions(
+    apiKey: 'AIzaSyC5HDcptF9kHIwPRVnqezF0QjA9-hcBOSw',
+    appId: '1:768083696940:android:0129c04e30b2445c172089',
+    messagingSenderId: '768083696940',
+    projectId: 'wedding-planner-615bc',
+    storageBucket: 'wedding-planner-615bc.firebasestorage.app',
+  );
 }

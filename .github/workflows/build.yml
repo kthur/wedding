@@ -14,9 +14,6 @@ permissions:
 jobs:
   build-android:
     runs-on: ubuntu-latest
-    env:
-      FIREBASE_ANDROID_APP_ID: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
-      FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -43,13 +40,22 @@ jobs:
       - name: Build App Bundle
         run: flutter build appbundle --release
 
+      - name: Check Firebase Credentials
+        id: firebase_check
+        run: |
+          if [ -n "${{ secrets.FIREBASE_ANDROID_APP_ID }}" ] && [ -n "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" ]; then
+            echo "has_credentials=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_credentials=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Deploy to Firebase App Distribution
-        if: ${{ env.FIREBASE_ANDROID_APP_ID != '' && env.FIREBASE_SERVICE_ACCOUNT != '' }}
+        if: steps.firebase_check.outputs.has_credentials == 'true'
         uses: w9jds/firebase-action@v15.22.1
         with:
-          args: appdistribution:distribute build/app/outputs/flutter-apk/app-release.apk --app ${{ env.FIREBASE_ANDROID_APP_ID }} --groups testers
+          args: appdistribution:distribute build/app/outputs/flutter-apk/app-release.apk --app ${{ secrets.FIREBASE_ANDROID_APP_ID }} --groups testers
         env:
-          GCP_SA_KEY: ${{ env.FIREBASE_SERVICE_ACCOUNT }}
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
 
       - name: Upload Android Artifacts
         if: always()

@@ -90,31 +90,8 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Enable Windows build
-        run: flutter config --enable-windows-desktop
-
       - name: Build Windows App
-        run: flutter build windows --release --verbose > windows_build.log 2>&1
-
-      - name: Upload Windows Build Log
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-build-log
-          path: windows_build.log
-
-      - name: Push Windows Build Log to Branch
-        if: failure()
-        shell: pwsh
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout --orphan debug-logs-windows
-          git rm -rf . --ignore-unmatch
-          Copy-Item windows_build.log index.log
-          git add index.log
-          git commit -m "ci: save windows build log"
-          git push -f origin HEAD:debug-logs-windows
+        run: flutter build windows --release
 
       - name: Package Windows App (Zip)
         shell: pwsh
@@ -144,26 +121,7 @@ jobs:
         run: flutter pub get
 
       - name: Build iOS App (No Codesign)
-        run: flutter build ios --release --no-codesign > ios_build.log 2>&1
-
-      - name: Upload iOS Build Log
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-build-log
-          path: ios_build.log
-
-      - name: Push iOS Build Log to Branch
-        if: failure()
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout --orphan debug-logs-ios
-          git rm -rf . --ignore-unmatch
-          cp ios_build.log index.log
-          git add index.log
-          git commit -m "ci: save ios build log"
-          git push -f origin HEAD:debug-logs-ios
+        run: flutter build ios --release --no-codesign
 
       - name: Package iOS App (Zip)
         run: |

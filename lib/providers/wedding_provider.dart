@@ -1,5 +1,3 @@
-import 'dart:math';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/couple_info.dart';
@@ -168,6 +166,19 @@ class WeddingNotifier extends StateNotifier<WeddingState> {
       final notes = _prefs.getString('${keyPrefix}notes') ?? '';
       final vendorName = _prefs.getString('${keyPrefix}vendorName') ?? '';
       final vendorPhone = _prefs.getString('${keyPrefix}vendorPhone') ?? '';
+      final photoCount = _prefs.getInt('${keyPrefix}photoCount') ?? 0;
+      List<CategoryPhoto> photos = [];
+      for (int i = 0; i < photoCount; i++) {
+        final photoKey = '${keyPrefix}photo_${i}_';
+        photos.add(
+          CategoryPhoto(
+            url: _prefs.getString('${photoKey}url') ?? '',
+            caption: _prefs.getString('${photoKey}caption') ?? '',
+            uploadedBy: _prefs.getString('${photoKey}uploadedBy') ?? '',
+            uploadedAt: DateTime.parse(_prefs.getString('${photoKey}uploadedAt') ?? DateTime.now().toIso8601String()),
+          ),
+        );
+      }
 
       categories.add(
         WeddingCategory(
@@ -181,7 +192,7 @@ class WeddingNotifier extends StateNotifier<WeddingState> {
           vendorName: vendorName,
           vendorPhone: vendorPhone,
           schedules: [],
-          photos: [],
+          photos: photos,
           updatedBy: '시스템',
           updatedAt: DateTime.now(),
         ),
@@ -423,6 +434,90 @@ class WeddingNotifier extends StateNotifier<WeddingState> {
     _prefs.setString('memo_${updated.length - 1}_time', timeStr);
 
     state = state.copyWith(memos: updated);
+  }
+
+  // 카테고리 사진 추가
+  void addCategoryPhoto(String categoryId, CategoryPhoto photo) {
+    final catIndex = state.categories.indexWhere((c) => c.id == categoryId);
+    if (catIndex != -1) {
+      final cat = state.categories[catIndex];
+      final updatedPhotos = [...cat.photos, photo];
+      final updatedCat = cat.copyWith(
+        photos: updatedPhotos,
+        updatedBy: state.currentUser?.name ?? '사용자',
+        updatedAt: DateTime.now(),
+      );
+
+      final keyPrefix = 'cat_${categoryId}_';
+      _prefs.setInt('${keyPrefix}photoCount', updatedPhotos.length);
+      final photoKey = '${keyPrefix}photo_${updatedPhotos.length - 1}_';
+      _prefs.setString('${photoKey}url', photo.url);
+      _prefs.setString('${photoKey}caption', photo.caption);
+      _prefs.setString('${photoKey}uploadedBy', photo.uploadedBy);
+      _prefs.setString('${photoKey}uploadedAt', photo.uploadedAt.toIso8601String());
+
+      state = state.copyWith(
+        categories: state.categories.map((c) => c.id == categoryId ? updatedCat : c).toList(),
+      );
+    }
+  }
+
+  // 카테고리 사진 삭제
+  void deleteCategoryPhoto(String categoryId, String photoUrl) {
+    final catIndex = state.categories.indexWhere((c) => c.id == categoryId);
+    if (catIndex != -1) {
+      final cat = state.categories[catIndex];
+      final updatedPhotos = cat.photos.where((p) => p.url != photoUrl).toList();
+      final updatedCat = cat.copyWith(
+        photos: updatedPhotos,
+        updatedBy: state.currentUser?.name ?? '사용자',
+        updatedAt: DateTime.now(),
+      );
+
+      final keyPrefix = 'cat_${categoryId}_';
+      _prefs.setInt('${keyPrefix}photoCount', updatedPhotos.length);
+      for (int i = 0; i < updatedPhotos.length; i++) {
+        final photoKey = '${keyPrefix}photo_${i}_';
+        _prefs.setString('${photoKey}url', updatedPhotos[i].url);
+        _prefs.setString('${photoKey}caption', updatedPhotos[i].caption);
+        _prefs.setString('${photoKey}uploadedBy', updatedPhotos[i].uploadedBy);
+        _prefs.setString('${photoKey}uploadedAt', updatedPhotos[i].uploadedAt.toIso8601String());
+      }
+
+      state = state.copyWith(
+        categories: state.categories.map((c) => c.id == categoryId ? updatedCat : c).toList(),
+      );
+    }
+  }
+
+  // 영수증 스캔을 통한 카테고리 예산/금액 업데이트
+  void updateCategoryBudgetFromScan(String categoryId, {required int actualCost, required String vendorName, required CategoryPhoto photo}) {
+    final catIndex = state.categories.indexWhere((c) => c.id == categoryId);
+    if (catIndex != -1) {
+      final cat = state.categories[catIndex];
+      final updatedPhotos = [...cat.photos, photo];
+      final updatedCat = cat.copyWith(
+        actualCost: actualCost,
+        vendorName: vendorName,
+        photos: updatedPhotos,
+        updatedBy: state.currentUser?.name ?? '사용자',
+        updatedAt: DateTime.now(),
+      );
+
+      final keyPrefix = 'cat_${categoryId}_';
+      _prefs.setInt('${keyPrefix}actualCost', actualCost);
+      _prefs.setString('${keyPrefix}vendorName', vendorName);
+      _prefs.setInt('${keyPrefix}photoCount', updatedPhotos.length);
+      final photoKey = '${keyPrefix}photo_${updatedPhotos.length - 1}_';
+      _prefs.setString('${photoKey}url', photo.url);
+      _prefs.setString('${photoKey}caption', photo.caption);
+      _prefs.setString('${photoKey}uploadedBy', photo.uploadedBy);
+      _prefs.setString('${photoKey}uploadedAt', photo.uploadedAt.toIso8601String());
+
+      state = state.copyWith(
+        categories: state.categories.map((c) => c.id == categoryId ? updatedCat : c).toList(),
+      );
+    }
   }
 }
 

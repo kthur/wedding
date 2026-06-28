@@ -62,18 +62,13 @@ jobs:
             echo "has_credentials=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Prepare Service Account Key
+      - name: Deploy to Firebase App Distribution
         if: steps.firebase_check.outputs.has_credentials == 'true'
         run: |
           echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}" | base64 --decode > gcp_key.json
-
-      - name: Deploy to Firebase App Distribution
-        if: steps.firebase_check.outputs.has_credentials == 'true'
-        uses: w9jds/firebase-action@v15.22.1
-        with:
-          args: appdistribution:distribute build/app/outputs/flutter-apk/app-release.apk --app ${{ secrets.FIREBASE_ANDROID_APP_ID }} --groups testers
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: /github/workspace/gcp_key.json
+          export GOOGLE_APPLICATION_CREDENTIALS="${PWD}/gcp_key.json"
+          npm install -g firebase-tools@15.22.3 2>&1 | tail -3
+          firebase appdistribution:distribute build/app/outputs/flutter-apk/app-release.apk --app ${{ secrets.FIREBASE_ANDROID_APP_ID }} --groups testers
 
       - name: Upload Android Artifacts
         if: always()

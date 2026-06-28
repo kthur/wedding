@@ -231,7 +231,7 @@ jobs:
       - name: Deploy to Firebase Hosting
         uses: w9jds/firebase-action@v15.22.1
         with:
-          args: deploy --only hosting
+          args: deploy --only hosting --project wedding-planner-615bc
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
 

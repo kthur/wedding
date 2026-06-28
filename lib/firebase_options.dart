@@ -11,7 +11,7 @@ class DefaultFirebaseOptions {
       case TargetPlatform.android:
         return android;
       case TargetPlatform.iOS:
-        throw UnsupportedError('iOS is not configured');
+        return ios;
       case TargetPlatform.windows:
         return web;
       default:
@@ -25,6 +25,15 @@ class DefaultFirebaseOptions {
     messagingSenderId: '768083696940',
     projectId: 'wedding-planner-615bc',
     storageBucket: 'wedding-planner-615bc.firebasestorage.app',
+  );
+
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'AIzaSyC960HG0URCf52x9ytxplD-omX13cn_kwU',
+    appId: '1:768083696940:ios:4337ae533e9e2a43172089',
+    messagingSenderId: '768083696940',
+    projectId: 'wedding-planner-615bc',
+    storageBucket: 'wedding-planner-615bc.firebasestorage.app',
+    iosBundleId: 'com.example.weddingPlanner',
   );
 
   static const FirebaseOptions web = FirebaseOptions(

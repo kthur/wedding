@@ -5,13 +5,15 @@ import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, Tar
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError('Web is not configured');
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
         return android;
       case TargetPlatform.iOS:
         throw UnsupportedError('iOS is not configured');
+      case TargetPlatform.windows:
+        return web;
       default:
         throw UnsupportedError('Unsupported platform');
     }
@@ -23,5 +25,15 @@ class DefaultFirebaseOptions {
     messagingSenderId: '768083696940',
     projectId: 'wedding-planner-615bc',
     storageBucket: 'wedding-planner-615bc.firebasestorage.app',
+  );
+
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyA5dTf6gjhenF0YsO3cRhk9xpgwSFNIutI',
+    appId: '1:768083696940:web:2b9deb03ab344a1c172089',
+    messagingSenderId: '768083696940',
+    projectId: 'wedding-planner-615bc',
+    authDomain: 'wedding-planner-615bc.firebaseapp.com',
+    storageBucket: 'wedding-planner-615bc.firebasestorage.app',
+    measurementId: 'G-WMYSBD2L5X',
   );
 }

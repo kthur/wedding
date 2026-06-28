@@ -54,7 +54,7 @@ jobs:
         id: firebase_check
         env:
           FIREBASE_ANDROID_APP_ID: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
-          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
         run: |
           if [ -n "$FIREBASE_ANDROID_APP_ID" ] && [ -n "$FIREBASE_SERVICE_ACCOUNT" ]; then
             echo "has_credentials=true" >> $GITHUB_OUTPUT
@@ -62,13 +62,24 @@ jobs:
             echo "has_credentials=false" >> $GITHUB_OUTPUT
           fi
 
+      - name: Authenticate with GCP Service Account
+        if: steps.firebase_check.outputs.has_credentials == 'true'
+        run: |
+          echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}" | base64 --decode > /opt/gcp_key.json
+
+      - name: Google Auth
+        if: steps.firebase_check.outputs.has_credentials == 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+
       - name: Deploy to Firebase App Distribution
         if: steps.firebase_check.outputs.has_credentials == 'true'
         uses: w9jds/firebase-action@v15.22.1
         with:
           args: appdistribution:distribute build/app/outputs/flutter-apk/app-release.apk --app ${{ secrets.FIREBASE_ANDROID_APP_ID }} --groups testers
         env:
-          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
 
       - name: Upload Android Artifacts
         if: always()

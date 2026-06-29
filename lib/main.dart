@@ -4,6 +4,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'providers/wedding_provider.dart';
+import 'providers/auth_provider.dart';
+import 'screens/login_screen.dart';
+import 'screens/profile_setup_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/preparation_screen.dart';
 import 'screens/schedule_screen.dart';
@@ -31,11 +34,30 @@ void main() async {
   );
 }
 
-class WeddingPlannerApp extends StatelessWidget {
+class WeddingPlannerApp extends ConsumerWidget {
   const WeddingPlannerApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authProvider);
+
+    Widget homeWidget;
+    if (authState.isLoading && authState.currentUser == null) {
+      homeWidget = const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF5271)),
+          ),
+        ),
+      );
+    } else if (authState.currentUser == null) {
+      homeWidget = const LoginScreen();
+    } else if (authState.currentUser!.name.isEmpty || authState.currentUser!.gender.isEmpty) {
+      homeWidget = const ProfileSetupScreen();
+    } else {
+      homeWidget = const MainNavigationScreen();
+    }
+
     return MaterialApp(
       title: 'Wedding Planner',
       debugShowCheckedModeBanner: false,
@@ -44,7 +66,7 @@ class WeddingPlannerApp extends StatelessWidget {
         useMaterial3: true,
         fontFamily: 'Pretendard',
       ),
-      home: const MainNavigationScreen(),
+      home: homeWidget,
     );
   }
 }

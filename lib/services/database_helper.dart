@@ -424,4 +424,17 @@ class DatabaseHelper {
       'time': memo['time'] as String,
     });
   }
+
+  Future<void> clearAllData() async {
+    final db = await instance.database;
+    await db.transaction((txn) async {
+      await txn.delete('couple_info');
+      await txn.delete('categories');
+      await txn.delete('category_photos');
+      await txn.delete('checklist');
+      await txn.delete('guests');
+      await txn.delete('memos');
+      await txn.delete('schedules');
+    });
+  }
 }

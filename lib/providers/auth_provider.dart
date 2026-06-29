@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/couple_info.dart';
 import '../services/database_helper.dart';
 import 'wedding_provider.dart' show sharedPreferencesProvider;
@@ -49,12 +50,29 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> _initAuth() async {
     state = state.copyWith(isLoading: true);
 
+    String? uid;
+    if (Firebase.apps.isNotEmpty) {
+      try {
+        final auth = FirebaseAuth.instance;
+        var user = auth.currentUser;
+        if (user == null) {
+          final cred = await auth.signInAnonymously();
+          user = cred.user;
+        }
+        uid = user?.uid;
+      } catch (e) {
+        debugPrint('Firebase Auth error: $e');
+      }
+    }
+
     // Initial default user if not exists
     if (!_prefs.containsKey('user_uid')) {
-      await _prefs.setString('user_uid', 'user_123');
+      await _prefs.setString('user_uid', uid ?? 'user_123');
       await _prefs.setString('user_name', '민우');
       await _prefs.setString('user_gender', 'male');
       await _prefs.setString('user_invite_code', 'W7A');
+    } else if (uid != null && _prefs.getString('user_uid') != uid) {
+      await _prefs.setString('user_uid', uid);
     }
 
     final currentUser = UserProfile(

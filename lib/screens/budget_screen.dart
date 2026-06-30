@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:intl/intl.dart';
 import '../providers/auth_provider.dart';
 import '../providers/category_provider.dart';
 
@@ -203,7 +205,10 @@ class BudgetScreen extends ConsumerWidget {
   }
 
   void _showEditBudgetGoalDialog(BuildContext context, WidgetRef ref, int currentGoal) {
-    final controller = TextEditingController(text: currentGoal.toString());
+    final numberFormat = NumberFormat('#,###');
+    final controller = TextEditingController(
+      text: currentGoal > 0 ? numberFormat.format(currentGoal) : '',
+    );
     showDialog(
       context: context,
       builder: (context) {
@@ -213,6 +218,7 @@ class BudgetScreen extends ConsumerWidget {
           content: TextField(
             controller: controller,
             keyboardType: TextInputType.number,
+            inputFormatters: [ThousandsSeparatorInputFormatter()],
             decoration: const InputDecoration(
               suffixText: '원',
               hintText: '목표 예산을 입력하세요',
@@ -225,7 +231,7 @@ class BudgetScreen extends ConsumerWidget {
             ),
             ElevatedButton(
               onPressed: () {
-                final value = int.tryParse(controller.text);
+                final value = int.tryParse(controller.text.replaceAll(',', ''));
                 if (value != null) {
                   ref.read(authProvider.notifier).updateBudgetGoal(value);
                   Navigator.pop(context);
@@ -269,5 +275,25 @@ class BudgetScreen extends ConsumerWidget {
 
   String _formatPrice(int price) {
     return price.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},');
+  }
+}
+
+class ThousandsSeparatorInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.text.isEmpty) {
+      return newValue.copyWith(text: '');
+    }
+
+    final cleanString = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    final numValue = int.tryParse(cleanString) ?? 0;
+    
+    final formatter = NumberFormat('#,###');
+    final formatted = formatter.format(numValue);
+    
+    return newValue.copyWith(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
   }
 }

@@ -94,6 +94,30 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
       ),
     );
 
+    void saveAction() {
+      final estCost = int.tryParse(_estCostController.text.replaceAll(',', '')) ?? 0;
+      final actCost = int.tryParse(_actCostController.text.replaceAll(',', '')) ?? 0;
+
+      final updated = category.copyWith(
+        status: _status,
+        estimatedCost: estCost,
+        actualCost: actCost,
+        notes: _notesController.text,
+        vendorName: _vendorNameController.text,
+        vendorPhone: _vendorPhoneController.text,
+        updatedBy: authState.currentUser?.name ?? '사용자',
+        updatedAt: DateTime.now(),
+      );
+
+      ref.read(categoryProvider.notifier).updateCategory(updated);
+      
+      final messenger = ScaffoldMessenger.of(context);
+      Navigator.pop(context);
+      messenger.showSnackBar(
+        const SnackBar(content: Text('준비 정보가 저장되었습니다! 💾')),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -109,29 +133,7 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              final estCost = int.tryParse(_estCostController.text.replaceAll(',', '')) ?? 0;
-              final actCost = int.tryParse(_actCostController.text.replaceAll(',', '')) ?? 0;
-
-              final updated = category.copyWith(
-                status: _status,
-                estimatedCost: estCost,
-                actualCost: actCost,
-                notes: _notesController.text,
-                vendorName: _vendorNameController.text,
-                vendorPhone: _vendorPhoneController.text,
-                updatedBy: authState.currentUser?.name ?? '사용자',
-                updatedAt: DateTime.now(),
-              );
-
-              ref.read(categoryProvider.notifier).updateCategory(updated);
-              
-              final messenger = ScaffoldMessenger.of(context);
-              Navigator.pop(context);
-              messenger.showSnackBar(
-                const SnackBar(content: Text('준비 정보가 저장되었습니다! 💾')),
-              );
-            },
+            onPressed: saveAction,
             child: const Text(
               '저장',
               style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFFF5271), fontSize: 16),
@@ -437,6 +439,27 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
                 },
               ),
           ],
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+          child: ElevatedButton(
+            onPressed: saveAction,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF5271),
+              foregroundColor: Colors.white,
+              minimumSize: const Size.fromHeight(52),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              elevation: 0,
+            ),
+            child: const Text(
+              '저장하기',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
         ),
       ),
     );

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../providers/auth_provider.dart';
 import '../providers/category_provider.dart';
 import '../providers/checklist_provider.dart';
+import 'package:flutter/services.dart';
 import '../models/wedding_category.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -23,8 +24,11 @@ class HomeScreen extends ConsumerWidget {
 
     // D-Day 계산
     String dDayStr = 'D-기한 없음';
-    if (isLinked && weddingDate != null) {
-      final diff = weddingDate.difference(DateTime.now()).inDays;
+    if (weddingDate != null) {
+      final today = DateTime.now();
+      final start = DateTime(today.year, today.month, today.day);
+      final end = DateTime(weddingDate.year, weddingDate.month, weddingDate.day);
+      final diff = end.difference(start).inDays;
       dDayStr = diff == 0 ? 'D-Day' : (diff > 0 ? 'D-$diff' : 'D+${diff.abs()}');
     }
 
@@ -86,7 +90,7 @@ class HomeScreen extends ConsumerWidget {
                         const Icon(Icons.favorite, size: 16, color: Color(0xFFFF5271)),
                         const SizedBox(width: 4),
                         Text(
-                          isLinked ? '연동 완료' : '솔로 모드',
+                          isLinked ? '연동 완료' : '연동 대기 중',
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
@@ -100,51 +104,78 @@ class HomeScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 24),
 
-              // D-Day 및 예산 위젯
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFFF7B93), Color(0xFFFF5271)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFFF5271).withValues(alpha: 0.3),
-                      blurRadius: 15,
-                      offset: const Offset(0, 8),
+              GestureDetector(
+                onTap: () async {
+                  final initialDate = weddingDate ?? DateTime.now().add(const Duration(days: 180));
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: initialDate,
+                    firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                    lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+                  );
+                  if (picked != null) {
+                    await ref.read(authProvider.notifier).updateWeddingDate(picked);
+                  }
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFF7B93), Color(0xFFFF5271)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          dDayStr,
-                          style: const TextStyle(
-                            fontSize: 36,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                            letterSpacing: -1,
-                          ),
-                        ),
-                        if (isLinked && weddingDate != null)
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFFF5271).withValues(alpha: 0.3),
+                        blurRadius: 15,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
                           Text(
-                            DateFormat('yyyy년 MM월 dd일').format(weddingDate),
+                            dDayStr,
                             style: const TextStyle(
-                              fontSize: 14,
-                              color: Colors.white70,
-                              fontWeight: FontWeight.w500,
+                              fontSize: 36,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              letterSpacing: -1,
                             ),
                           ),
-                      ],
-                    ),
+                          if (weddingDate != null)
+                            Text(
+                              DateFormat('yyyy년 MM월 dd일').format(weddingDate),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Colors.white70,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            )
+                          else
+                            const Row(
+                              children: [
+                                Text(
+                                  '터치하여 날짜 등록',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.white70,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                SizedBox(width: 4),
+                                Icon(Icons.edit_calendar_rounded, size: 16, color: Colors.white70),
+                              ],
+                            ),
+                        ],
+                      ),
                     const SizedBox(height: 24),
                     const Text(
                       '결혼 준비 진행률',
@@ -202,7 +233,8 @@ class HomeScreen extends ConsumerWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 28),
+            ),
+            const SizedBox(height: 28),
 
               // 파트너 연동 안내 (연동 안 되어있을 시)
               if (!isLinked) ...[
@@ -232,11 +264,51 @@ class HomeScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        '초대 코드 [ ${currentUser?.inviteCode ?? ""} ]를 파트너 앱에 입력하면 예산, 일정 및 체크리스트가 실시간으로 동기화됩니다.',
+                        '초대 코드를 파트너 앱에 입력하면 예산, 일정 및 체크리스트가 실시간으로 동기화됩니다.',
                         style: const TextStyle(
                           fontSize: 13,
                           color: Color(0xFF757575),
                           height: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8F9FA),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE9ECEF)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '나의 초대 코드: ${currentUser?.inviteCode ?? ""}',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF2C3E50),
+                              ),
+                            ),
+                            TextButton.icon(
+                              onPressed: () {
+                                Clipboard.setData(ClipboardData(text: currentUser?.inviteCode ?? ''));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('초대 코드가 클립보드에 복사되었습니다.')),
+                                );
+                              },
+                              icon: const Icon(Icons.copy, size: 16, color: Color(0xFFFF5271)),
+                              label: const Text(
+                                '복사',
+                                style: TextStyle(color: Color(0xFFFF5271), fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                              style: TextButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 16),

@@ -89,7 +89,40 @@ class BudgetScreen extends ConsumerWidget {
               ),
               child: Column(
                 children: [
-                  _buildBudgetRow('목표 예산', '${_formatPrice(goal)}원', Colors.black, true),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          const Text(
+                            '목표 예산',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF555555),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          IconButton(
+                            icon: const Icon(Icons.edit, size: 16, color: Color(0xFFFF5271)),
+                            constraints: const BoxConstraints(),
+                            padding: EdgeInsets.zero,
+                            onPressed: () {
+                              _showEditBudgetGoalDialog(context, ref, goal);
+                            },
+                          ),
+                        ],
+                      ),
+                      Text(
+                        '${_formatPrice(goal)}원',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ],
+                  ),
                   const Divider(height: 24),
                   _buildBudgetRow('예상 금액 합계', '${_formatPrice(estimatedTotal)}원', Colors.grey, false),
                   const SizedBox(height: 8),
@@ -151,6 +184,47 @@ class BudgetScreen extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+
+  void _showEditBudgetGoalDialog(BuildContext context, WidgetRef ref, int currentGoal) {
+    final controller = TextEditingController(text: currentGoal.toString());
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          title: const Text('목표 예산 수정', style: TextStyle(fontWeight: FontWeight.bold)),
+          content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              suffixText: '원',
+              hintText: '목표 예산을 입력하세요',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('취소', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final value = int.tryParse(controller.text);
+                if (value != null) {
+                  ref.read(authProvider.notifier).updateBudgetGoal(value);
+                  Navigator.pop(context);
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFF5271),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('저장'),
+            ),
+          ],
+        );
+      },
     );
   }
 

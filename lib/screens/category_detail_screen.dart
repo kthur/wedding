@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import '../models/wedding_category.dart';
 import '../providers/auth_provider.dart';
 import '../providers/category_provider.dart';
@@ -46,9 +48,14 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
       ),
     );
 
+    final numberFormat = NumberFormat('#,###');
     _notesController = TextEditingController(text: category.notes);
-    _estCostController = TextEditingController(text: category.estimatedCost.toString());
-    _actCostController = TextEditingController(text: category.actualCost.toString());
+    _estCostController = TextEditingController(
+      text: category.estimatedCost > 0 ? numberFormat.format(category.estimatedCost) : '',
+    );
+    _actCostController = TextEditingController(
+      text: category.actualCost > 0 ? numberFormat.format(category.actualCost) : '',
+    );
     _vendorNameController = TextEditingController(text: category.vendorName);
     _vendorPhoneController = TextEditingController(text: category.vendorPhone);
     _status = category.status;
@@ -103,8 +110,8 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
         actions: [
           TextButton(
             onPressed: () {
-              final estCost = int.tryParse(_estCostController.text) ?? 0;
-              final actCost = int.tryParse(_actCostController.text) ?? 0;
+              final estCost = int.tryParse(_estCostController.text.replaceAll(',', '')) ?? 0;
+              final actCost = int.tryParse(_actCostController.text.replaceAll(',', '')) ?? 0;
 
               final updated = category.copyWith(
                 status: _status,
@@ -229,6 +236,7 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
                       TextField(
                         controller: _estCostController,
                         keyboardType: TextInputType.number,
+                        inputFormatters: [ThousandsSeparatorInputFormatter()],
                         decoration: InputDecoration(
                           hintText: '예상 지출액',
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -251,6 +259,7 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
                       TextField(
                         controller: _actCostController,
                         keyboardType: TextInputType.number,
+                        inputFormatters: [ThousandsSeparatorInputFormatter()],
                         decoration: InputDecoration(
                           hintText: '실제 지출액',
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -291,6 +300,7 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
                   TextField(
                     controller: _vendorPhoneController,
                     keyboardType: TextInputType.phone,
+                    inputFormatters: [PhoneInputFormatter()],
                     decoration: const InputDecoration(
                       labelText: '연락처 (전화번호)',
                       prefixIcon: Icon(Icons.phone, color: Colors.grey),
@@ -936,6 +946,50 @@ class _ScannerProgressDialogState extends State<_ScannerProgressDialog> with Sin
           ],
         ),
       ),
+    );
+  }
+}
+
+class ThousandsSeparatorInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.text.isEmpty) {
+      return newValue.copyWith(text: '');
+    }
+
+    final cleanString = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    final numValue = int.tryParse(cleanString) ?? 0;
+    
+    final formatter = NumberFormat('#,###');
+    final formatted = formatter.format(numValue);
+    
+    return newValue.copyWith(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
+class PhoneInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    final text = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (text.isEmpty) return newValue.copyWith(text: '');
+
+    String formatted = '';
+    if (text.length <= 3) {
+      formatted = text;
+    } else if (text.length <= 7) {
+      formatted = '${text.substring(0, 3)}-${text.substring(3)}';
+    } else if (text.length <= 11) {
+      formatted = '${text.substring(0, 3)}-${text.substring(3, 7)}-${text.substring(7)}';
+    } else {
+      formatted = '${text.substring(0, 3)}-${text.substring(3, 7)}-${text.substring(7, 11)}';
+    }
+
+    return newValue.copyWith(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
 }

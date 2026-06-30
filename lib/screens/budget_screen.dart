@@ -38,20 +38,26 @@ class BudgetScreen extends ConsumerWidget {
       const Color(0xFF2196F3),
       const Color(0xFF9C27B0),
     ];
+    
+    final Map<String, Color> groupColorMap = {};
     int colorIdx = 0;
 
     groupCostMap.forEach((groupName, cost) {
       if (cost > 0) {
+        final sectionColor = colors[colorIdx % colors.length];
+        groupColorMap[groupName] = sectionColor;
         sections.add(
           PieChartSectionData(
             value: cost.toDouble(),
             title: groupName,
-            color: colors[colorIdx % colors.length],
+            color: sectionColor,
             radius: 50,
             titleStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
           ),
         );
         colorIdx++;
+      } else {
+        groupColorMap[groupName] = Colors.grey[300]!;
       }
     });
 
@@ -164,6 +170,7 @@ class BudgetScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
             ...groupCostMap.entries.map((entry) {
+              final color = groupColorMap[entry.key] ?? Colors.grey[300]!;
               return Card(
                 color: Colors.white,
                 elevation: 0,
@@ -173,6 +180,14 @@ class BudgetScreen extends ConsumerWidget {
                   side: const BorderSide(color: Color(0xFFEEEEEE)),
                 ),
                 child: ListTile(
+                  leading: Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
                   title: Text(entry.key, style: const TextStyle(fontWeight: FontWeight.bold)),
                   trailing: Text(
                     '${_formatPrice(entry.value)}원',

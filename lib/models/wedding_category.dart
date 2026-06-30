@@ -11,7 +11,8 @@ DateTime _parseDateTime(dynamic val) {
 enum PreparationStatus {
   none,
   inProgress,
-  done;
+  done,
+  skipped;
 
   String get displayName {
     switch (this) {
@@ -21,6 +22,8 @@ enum PreparationStatus {
         return '진행중';
       case PreparationStatus.done:
         return '완료';
+      case PreparationStatus.skipped:
+        return '해당없음';
     }
   }
 }

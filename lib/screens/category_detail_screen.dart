@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../models/wedding_category.dart';
 import '../providers/auth_provider.dart';
 import '../providers/category_provider.dart';
+import '../services/ocr_service.dart';
 
 class CategoryDetailScreen extends ConsumerStatefulWidget {
   final String categoryId;
@@ -164,6 +165,9 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
                 } else if (status == PreparationStatus.done) {
                   statusColor = const Color(0xFFFF5271);
                   selectedBg = const Color(0xFFFFF0F2);
+                } else if (status == PreparationStatus.skipped) {
+                  statusColor = const Color(0xFF9E9E9E);
+                  selectedBg = const Color(0xFFF5F5F5);
                 }
 
                 return Expanded(
@@ -499,10 +503,18 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: () async {
-                        final XFile? file = await picker.pickImage(source: ImageSource.camera);
-                        if (file != null) {
-                          Navigator.pop(context);
-                          _saveCategoryPhoto(category.id, file.path, caption);
+                        try {
+                          final XFile? file = await picker.pickImage(source: ImageSource.camera);
+                          if (file != null) {
+                            Navigator.pop(context);
+                            _saveCategoryPhoto(category.id, file.path, caption);
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('카메라를 사용할 수 없습니다. 권한을 확인해 주세요.')),
+                            );
+                          }
                         }
                       },
                       icon: const Icon(Icons.camera_alt),
@@ -517,10 +529,18 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: () async {
-                        final XFile? file = await picker.pickImage(source: ImageSource.gallery);
-                        if (file != null) {
-                          Navigator.pop(context);
-                          _saveCategoryPhoto(category.id, file.path, caption);
+                        try {
+                          final XFile? file = await picker.pickImage(source: ImageSource.gallery);
+                          if (file != null) {
+                            Navigator.pop(context);
+                            _saveCategoryPhoto(category.id, file.path, caption);
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('갤러리를 불러올 수 없습니다. 권한을 확인해 주세요.')),
+                            );
+                          }
                         }
                       },
                       icon: const Icon(Icons.photo_library),
@@ -632,10 +652,18 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () async {
-                      final XFile? file = await picker.pickImage(source: ImageSource.camera);
-                      if (file != null) {
-                        Navigator.pop(context);
-                        _runScannerAnimation(file.path, false, category);
+                      try {
+                        final XFile? file = await picker.pickImage(source: ImageSource.camera);
+                        if (file != null) {
+                          Navigator.pop(context);
+                          _runScannerAnimation(file.path, false, category);
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('카메라를 사용할 수 없습니다. 권한을 확인해 주세요.')),
+                          );
+                        }
                       }
                     },
                     icon: const Icon(Icons.camera_alt),
@@ -650,10 +678,18 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () async {
-                      final XFile? file = await picker.pickImage(source: ImageSource.gallery);
-                      if (file != null) {
-                        Navigator.pop(context);
-                        _runScannerAnimation(file.path, false, category);
+                      try {
+                        final XFile? file = await picker.pickImage(source: ImageSource.gallery);
+                        if (file != null) {
+                          Navigator.pop(context);
+                          _runScannerAnimation(file.path, false, category);
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('갤러리를 불러올 수 없습니다. 권한을 확인해 주세요.')),
+                          );
+                        }
                       }
                     },
                     icon: const Icon(Icons.photo_library),
@@ -670,9 +706,9 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: () {
+                onPressed: () async {
                   Navigator.pop(context);
-                  _runScannerAnimation('', true, category);
+                  await _runScannerAnimation('', true, category);
                 },
                 icon: const Icon(Icons.document_scanner, color: Colors.white),
                 label: const Text('데모 영수증 스캔 (테스트용)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -690,42 +726,60 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
     );
   }
 
-  void _runScannerAnimation(String path, bool isDemo, WeddingCategory category) {
+  Future<void> _runScannerAnimation(String path, bool isDemo, WeddingCategory category) async {
     String mockVendor = '';
     int mockCost = 0;
     String mockItem = '';
+    final scanDuration = isDemo ? const Duration(seconds: 3) : Duration.zero;
 
-    switch (category.id) {
-      case 'hall':
-        mockVendor = '그랜드 베네치아 웨딩홀';
-        mockCost = 8500000;
-        mockItem = '대관료 및 음향 연출 패키지';
-        break;
-      case 'sdm':
-        mockVendor = '청담 벨에포크 드레스';
-        mockCost = 3200000;
-        mockItem = '스튜디오 촬영용 드레스 + 메이크업 패키지';
-        break;
-      case 'ring':
-        mockVendor = '메종 드 다이아';
-        mockCost = 2600000;
-        mockItem = '18K 웨딩 밴드 커플링';
-        break;
-      case 'snap':
-        mockVendor = '로맨틱 메모리즈 스튜디오';
-        mockCost = 1500000;
-        mockItem = '본식 앨범 제작 + 원본 데이터';
-        break;
-      case 'honeymoon':
-        mockVendor = '허니투어 여행사';
-        mockCost = 4500000;
-        mockItem = '발리 풀빌라 5박 7일 허니문 패키지';
-        break;
-      default:
-        mockVendor = '${category.name} 전문 계약점';
-        mockCost = 980000;
-        mockItem = '${category.name} 이용 계약 정산';
+    if (!isDemo && path.isNotEmpty) {
+      try {
+        final result = await OcrService.recognizeReceipt(path);
+        if (result != null) {
+          mockVendor = result.vendorName ?? '';
+          mockCost = result.totalCost ?? 0;
+          mockItem = 'OCR 인식 결과';
+        }
+      } catch (e) {
+        debugPrint('Receipt OCR error: $e');
+      }
     }
+
+    if (mockVendor.isEmpty) {
+      switch (category.id) {
+        case 'hall':
+          mockVendor = '그랜드 베네치아 웨딩홀';
+          mockCost = 8500000;
+          mockItem = '대관료 및 음향 연출 패키지';
+          break;
+        case 'sdm':
+          mockVendor = '청담 벨에포크 드레스';
+          mockCost = 3200000;
+          mockItem = '스튜디오 촬영용 드레스 + 메이크업 패키지';
+          break;
+        case 'ring':
+          mockVendor = '메종 드 다이아';
+          mockCost = 2600000;
+          mockItem = '18K 웨딩 밴드 커플링';
+          break;
+        case 'snap':
+          mockVendor = '로맨틱 메모리즈 스튜디오';
+          mockCost = 1500000;
+          mockItem = '본식 앨범 제작 + 원본 데이터';
+          break;
+        case 'honeymoon':
+          mockVendor = '허니투어 여행사';
+          mockCost = 4500000;
+          mockItem = '발리 풀빌라 5박 7일 허니문 패키지';
+          break;
+        default:
+          mockVendor = '${category.name} 전문 계약점';
+          mockCost = 980000;
+          mockItem = '${category.name} 이용 계약 정산';
+      }
+    }
+
+    if (!context.mounted) return;
 
     showDialog(
       context: context,
@@ -737,9 +791,10 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
         mockVendor: mockVendor,
         mockCost: mockCost,
         mockItem: mockItem,
+        scanDuration: scanDuration,
         onScanComplete: (vendor, cost, finalPath) {
           setState(() {
-            _actCostController.text = cost.toString();
+            _actCostController.text = NumberFormat('#,###').format(cost);
             _vendorNameController.text = vendor;
           });
           
@@ -773,6 +828,7 @@ class _ScannerProgressDialog extends StatefulWidget {
   final String mockVendor;
   final int mockCost;
   final String mockItem;
+  final Duration scanDuration;
   final Function(String vendor, int cost, String path) onScanComplete;
 
   const _ScannerProgressDialog({
@@ -782,6 +838,7 @@ class _ScannerProgressDialog extends StatefulWidget {
     required this.mockVendor,
     required this.mockCost,
     required this.mockItem,
+    this.scanDuration = const Duration(seconds: 3),
     required this.onScanComplete,
   });
 
@@ -799,10 +856,10 @@ class _ScannerProgressDialogState extends State<_ScannerProgressDialog> with Sin
   void initState() {
     super.initState();
     _vendorController = TextEditingController(text: widget.mockVendor);
-    _costController = TextEditingController(text: widget.mockCost.toString());
+    _costController = TextEditingController(text: NumberFormat('#,###').format(widget.mockCost));
 
     _animationController = AnimationController(
-      duration: const Duration(seconds: 3),
+      duration: widget.scanDuration,
       vsync: this,
     );
 
@@ -929,6 +986,7 @@ class _ScannerProgressDialogState extends State<_ScannerProgressDialog> with Sin
               TextField(
                 controller: _costController,
                 keyboardType: TextInputType.number,
+                inputFormatters: [ThousandsSeparatorInputFormatter()],
                 decoration: const InputDecoration(
                   labelText: '검출된 금액 (원)',
                   border: OutlineInputBorder(),
@@ -948,7 +1006,7 @@ class _ScannerProgressDialogState extends State<_ScannerProgressDialog> with Sin
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () {
-                        final costVal = int.tryParse(_costController.text) ?? widget.mockCost;
+                        final costVal = int.tryParse(_costController.text.replaceAll(',', '')) ?? widget.mockCost;
                         final vendorVal = _vendorController.text.isEmpty ? widget.mockVendor : _vendorController.text;
                         final finalPath = widget.isDemo
                             ? 'https://picsum.photos/600/800?random=${DateTime.now().millisecond}'

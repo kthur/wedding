@@ -134,7 +134,7 @@ class CategoryNotifier extends StateNotifier<List<WeddingCategory>> {
     state = state.map((c) => c.id == updated.id ? updated : c).toList();
 
     // Trigger checklist sync
-    if (updated.status == PreparationStatus.done) {
+    if (updated.status == PreparationStatus.done || updated.status == PreparationStatus.skipped) {
       _ref.read(checklistProvider.notifier).updateTimelineByLinkedCategory(updated.id, true);
     } else if (updated.status == PreparationStatus.none) {
       _ref.read(checklistProvider.notifier).updateTimelineByLinkedCategory(updated.id, false);

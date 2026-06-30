@@ -97,6 +97,8 @@ class _PreparationScreenState extends ConsumerState<PreparationScreen> with Sing
                       statusColor = Colors.orange;
                     } else if (cat.status == PreparationStatus.done) {
                       statusColor = const Color(0xFFFF5271);
+                    } else if (cat.status == PreparationStatus.skipped) {
+                      statusColor = const Color(0xFF9E9E9E);
                     }
 
                     return Card(

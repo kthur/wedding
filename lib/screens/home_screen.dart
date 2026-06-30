@@ -32,10 +32,11 @@ class HomeScreen extends ConsumerWidget {
       dDayStr = diff == 0 ? 'D-Day' : (diff > 0 ? 'D-$diff' : 'D+${diff.abs()}');
     }
 
-    // 전체 진행률 계산
-    final total = categories.length;
-    final completed = categories.where((c) => c.status == PreparationStatus.done).length;
-    final inProgress = categories.where((c) => c.status == PreparationStatus.inProgress).length;
+    // 전체 진행률 계산 (해당없음 제외)
+    final activeCategories = categories.where((c) => c.status != PreparationStatus.skipped).toList();
+    final total = activeCategories.length;
+    final completed = activeCategories.where((c) => c.status == PreparationStatus.done).length;
+    final inProgress = activeCategories.where((c) => c.status == PreparationStatus.inProgress).length;
     final progressPercentage = total > 0 ? ((completed / total) * 100).toInt() : 0;
 
     // 다가오는 일정 (최대 3개)

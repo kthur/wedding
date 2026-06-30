@@ -44,5 +44,8 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# Android Kotlin generated files
+/android/.kotlin/
+
 # Firebase
 **/google-services.json

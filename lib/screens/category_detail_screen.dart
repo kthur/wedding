@@ -745,6 +745,15 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
       }
     }
 
+    if (!isDemo && mockVendor.isEmpty && mockCost == 0) {
+      if (!context.mounted) return;
+      _saveCategoryPhoto(category.id, path, '영수증/계약서 사진');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('영수증 텍스트를 인식하지 못했습니다. 사진은 첨부되었습니다.')),
+      );
+      return;
+    }
+
     if (mockVendor.isEmpty) {
       switch (category.id) {
         case 'hall':

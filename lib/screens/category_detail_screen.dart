@@ -373,7 +373,7 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
                   ],
                 ),
               )
-            else
+              else
               GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -388,18 +388,21 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
                   final photo = category.photos[idx];
                   return Stack(
                     children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFFEEEEEE)),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(15),
-                          child: photo.url.startsWith('http')
-                              ? Image.network(photo.url, fit: BoxFit.cover, width: double.infinity, height: double.infinity)
-                              : photo.url.startsWith('assets/')
-                                  ? Image.asset(photo.url, fit: BoxFit.cover, width: double.infinity, height: double.infinity)
-                                  : Image.file(File(photo.url), fit: BoxFit.cover, width: double.infinity, height: double.infinity),
+                      GestureDetector(
+                        onTap: () => _showPhotoEnlarged(context, photo),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFFEEEEEE)),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(15),
+                            child: photo.url.startsWith('http')
+                                ? Image.network(photo.url, fit: BoxFit.cover, width: double.infinity, height: double.infinity)
+                                : photo.url.startsWith('assets/')
+                                    ? Image.asset(photo.url, fit: BoxFit.cover, width: double.infinity, height: double.infinity)
+                                    : Image.file(File(photo.url), fit: BoxFit.cover, width: double.infinity, height: double.infinity),
+                          ),
                         ),
                       ),
                       Positioned(
@@ -611,8 +614,57 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
     );
   }
 
+  void _showPhotoEnlarged(BuildContext context, CategoryPhoto photo) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            InteractiveViewer(
+              minScale: 1.0,
+              maxScale: 5.0,
+              child: Center(
+                child: photo.url.startsWith('http')
+                    ? Image.network(photo.url, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, color: Colors.white54, size: 64))
+                    : photo.url.startsWith('assets/')
+                        ? Image.asset(photo.url, fit: BoxFit.contain)
+                        : Image.file(File(photo.url), fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, color: Colors.white54, size: 64)),
+              ),
+            ),
+            Positioned(
+              top: 40,
+              right: 16,
+              child: CircleAvatar(
+                backgroundColor: Colors.white24,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ),
+            ),
+            if (photo.caption.isNotEmpty)
+              Positioned(
+                bottom: 40,
+                left: 16,
+                right: 16,
+                child: Text(
+                  photo.caption,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white70, fontSize: 14),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _showReceiptScanner(BuildContext context, WeddingCategory category) async {
     final ImagePicker picker = ImagePicker();
+    const demoReceiptUrl = 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=600';
 
     showModalBottomSheet(
       context: context,
@@ -659,11 +711,9 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
                           _runScannerAnimation(file.path, false, category);
                         }
                       } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('카메라를 사용할 수 없습니다. 권한을 확인해 주세요.')),
-                          );
-                        }
+                        if (!context.mounted) return;
+                        Navigator.pop(context);
+                        await _runScannerAnimation(demoReceiptUrl, true, category);
                       }
                     },
                     icon: const Icon(Icons.camera_alt),
@@ -685,11 +735,9 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
                           _runScannerAnimation(file.path, false, category);
                         }
                       } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('갤러리를 불러올 수 없습니다. 권한을 확인해 주세요.')),
-                          );
-                        }
+                        if (!context.mounted) return;
+                        Navigator.pop(context);
+                        await _runScannerAnimation(demoReceiptUrl, true, category);
                       }
                     },
                     icon: const Icon(Icons.photo_library),
@@ -708,7 +756,7 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
               child: ElevatedButton.icon(
                 onPressed: () async {
                   Navigator.pop(context);
-                  await _runScannerAnimation('', true, category);
+                  await _runScannerAnimation(demoReceiptUrl, true, category);
                 },
                 icon: const Icon(Icons.document_scanner, color: Colors.white),
                 label: const Text('데모 영수증 스캔 (테스트용)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -727,25 +775,27 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
   }
 
   Future<void> _runScannerAnimation(String path, bool isDemo, WeddingCategory category) async {
-    String mockVendor = '';
-    int mockCost = 0;
-    String mockItem = '';
+    String vendor = '';
+    int cost = 0;
+    String item = '';
+    String receiptImageUrl = path;
+    final isRealImage = !isDemo && !path.startsWith('http');
     final scanDuration = isDemo ? const Duration(seconds: 3) : Duration.zero;
 
-    if (!isDemo && path.isNotEmpty) {
+    if (isRealImage && path.isNotEmpty) {
       try {
         final result = await OcrService.recognizeReceipt(path);
         if (result != null) {
-          mockVendor = result.vendorName ?? '';
-          mockCost = result.totalCost ?? 0;
-          mockItem = 'OCR 인식 결과';
+          vendor = result.vendorName ?? '';
+          cost = result.totalCost ?? 0;
+          item = 'OCR 인식 결과';
         }
       } catch (e) {
         debugPrint('Receipt OCR error: $e');
       }
     }
 
-    if (!isDemo && mockVendor.isEmpty && mockCost == 0) {
+    if (isRealImage && vendor.isEmpty && cost == 0) {
       if (!context.mounted) return;
       _saveCategoryPhoto(category.id, path, '영수증/계약서 사진');
       ScaffoldMessenger.of(context).showSnackBar(
@@ -754,70 +804,70 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
       return;
     }
 
-    if (mockVendor.isEmpty) {
+    if (vendor.isEmpty) {
       switch (category.id) {
         case 'hall':
-          mockVendor = '그랜드 베네치아 웨딩홀';
-          mockCost = 8500000;
-          mockItem = '대관료 및 음향 연출 패키지';
+          vendor = '그랜드 베네치아 웨딩홀';
+          cost = 8500000;
+          item = '대관료 및 음향 연출 패키지';
           break;
         case 'sdm':
-          mockVendor = '청담 벨에포크 드레스';
-          mockCost = 3200000;
-          mockItem = '스튜디오 촬영용 드레스 + 메이크업 패키지';
+          vendor = '청담 벨에포크 드레스';
+          cost = 3200000;
+          item = '스튜디오 촬영용 드레스 + 메이크업 패키지';
           break;
         case 'ring':
-          mockVendor = '메종 드 다이아';
-          mockCost = 2600000;
-          mockItem = '18K 웨딩 밴드 커플링';
+          vendor = '메종 드 다이아';
+          cost = 2600000;
+          item = '18K 웨딩 밴드 커플링';
           break;
         case 'snap':
-          mockVendor = '로맨틱 메모리즈 스튜디오';
-          mockCost = 1500000;
-          mockItem = '본식 앨범 제작 + 원본 데이터';
+          vendor = '로맨틱 메모리즈 스튜디오';
+          cost = 1500000;
+          item = '본식 앨범 제작 + 원본 데이터';
           break;
         case 'honeymoon':
-          mockVendor = '허니투어 여행사';
-          mockCost = 4500000;
-          mockItem = '발리 풀빌라 5박 7일 허니문 패키지';
+          vendor = '허니투어 여행사';
+          cost = 4500000;
+          item = '발리 풀빌라 5박 7일 허니문 패키지';
           break;
         default:
-          mockVendor = '${category.name} 전문 계약점';
-          mockCost = 980000;
-          mockItem = '${category.name} 이용 계약 정산';
+          vendor = '${category.name} 전문 계약점';
+          cost = 980000;
+          item = '${category.name} 이용 계약 정산';
       }
     }
 
     if (!context.mounted) return;
 
-    showDialog(
+    await showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => _ScannerProgressDialog(
-        imagePath: path,
+        imagePath: receiptImageUrl,
         isDemo: isDemo,
         category: category,
-        mockVendor: mockVendor,
-        mockCost: mockCost,
-        mockItem: mockItem,
+        mockVendor: vendor,
+        mockCost: cost,
+        mockItem: item,
         scanDuration: scanDuration,
-        onScanComplete: (vendor, cost, finalPath) {
+        onScanComplete: (finalVendor, finalCost, finalPath) {
           setState(() {
-            _actCostController.text = NumberFormat('#,###').format(cost);
-            _vendorNameController.text = vendor;
+            _actCostController.text = NumberFormat('#,###').format(finalCost);
+            _vendorNameController.text = finalVendor;
           });
-          
+
           final scanPhoto = CategoryPhoto(
             url: finalPath,
             caption: '영수증/계약서 스캔 내역',
             uploadedBy: ref.read(authProvider).currentUser?.name ?? '사용자',
             uploadedAt: DateTime.now(),
           );
-          
+
           ref.read(categoryProvider.notifier).updateCategoryBudgetFromScan(
             category.id,
-            actualCost: cost,
-            vendorName: vendor,
+            actualCost: finalCost,
+            vendorName: finalVendor,
             photo: scanPhoto,
           );
 
@@ -917,27 +967,27 @@ class _ScannerProgressDialogState extends State<_ScannerProgressDialog> with Sin
                     // 이미지 프리뷰
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: widget.isDemo
-                          ? Container(
-                              width: 150,
-                              height: 180,
-                              color: Colors.grey[100],
-                              child: Center(
-                                child: Opacity(
-                                  opacity: 0.6,
-                                  child: Image.network(
-                                    'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=300',
-                                    fit: BoxFit.cover,
-                                  ),
+                      child: SizedBox(
+                        width: 150,
+                        height: 180,
+                        child: widget.imagePath.startsWith('http')
+                            ? Opacity(
+                                opacity: 0.6,
+                                child: Image.network(
+                                  widget.imagePath,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Container(color: Colors.grey[100], child: const Icon(Icons.receipt_long, size: 48, color: Colors.grey)),
+                                ),
+                              )
+                            : Opacity(
+                                opacity: 0.6,
+                                child: Image.file(
+                                  File(widget.imagePath),
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Container(color: Colors.grey[100], child: const Icon(Icons.receipt_long, size: 48, color: Colors.grey)),
                                 ),
                               ),
-                            )
-                          : Image.file(
-                              File(widget.imagePath),
-                              fit: BoxFit.cover,
-                              width: 150,
-                              height: 180,
-                            ),
+                      ),
                     ),
                     // 스캔 레이저 라인 애니메이션
                     AnimatedBuilder(
@@ -1017,12 +1067,9 @@ class _ScannerProgressDialogState extends State<_ScannerProgressDialog> with Sin
                       onPressed: () {
                         final costVal = int.tryParse(_costController.text.replaceAll(',', '')) ?? widget.mockCost;
                         final vendorVal = _vendorController.text.isEmpty ? widget.mockVendor : _vendorController.text;
-                        final finalPath = widget.isDemo
-                            ? 'https://picsum.photos/600/800?random=${DateTime.now().millisecond}'
-                            : widget.imagePath;
 
                         Navigator.pop(context);
-                        widget.onScanComplete(vendorVal, costVal, finalPath);
+                        widget.onScanComplete(vendorVal, costVal, widget.imagePath);
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFFF5271),
